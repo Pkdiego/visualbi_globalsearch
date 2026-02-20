@@ -80,7 +80,7 @@ interface I18nStrings {
 const I18N: Record<string, I18nStrings> = {
   "pt": {
     placeholder:  "Pesquisar em todos os campos...",
-    searchIn:     "Pesquisar em:",
+    searchIn:     "Pesquisar por:",
     suggestions:  "Sugestões",
     noResults:    "Nenhum resultado encontrado para",
     landingTitle: "Global Search",
@@ -136,7 +136,7 @@ const I18N: Record<string, I18nStrings> = {
   },
   "es": {
     placeholder:  "Buscar en todos los campos...",
-    searchIn:     "Buscar en:",
+    searchIn:     "Buscar por:",
     suggestions:  "Sugerencias",
     noResults:    "Sin resultados para",
     landingTitle: "Global Search",
@@ -192,7 +192,7 @@ const I18N: Record<string, I18nStrings> = {
   },
   "en": {
     placeholder:  "Search in all fields...",
-    searchIn:     "Search in:",
+    searchIn:     "Search by:",
     suggestions:  "Suggestions",
     noResults:    "No results found for",
     landingTitle: "Global Search",
@@ -262,6 +262,7 @@ interface FieldData {
   tableName: string;
   values: string[];
   columnIndex: number;
+  fieldType: 'text' | 'numeric' | 'date';
 }
 
 type RawRow = Map<number, string>;
@@ -271,6 +272,7 @@ interface Suggestion {
   fieldName: string;   // nome de exibição
   columnName: string;  // nome real da coluna no modelo
   tableName: string;
+  fieldType: 'text' | 'numeric' | 'date';
 }
 
 interface ActiveFilter {
@@ -459,7 +461,7 @@ export class SmartSearchVisual implements IVisual {
           <button class="clear-btn" id="clearBtn" title="${this.t.clearTitle}">&#x2715;</button>
         </div>
         <div class="suggestions-dropdown" id="suggestionsDropdown">
-          <div class="suggestions-header" id="suggestionsHeader">${this.t.suggestions}</div>
+          <div class="suggestions-header" id="suggestionsHeader">${this.t.suggestions}<span class="searching-dots"><span>.</span><span>.</span><span>.</span></span></div>
           <div id="suggestionsList"></div>
         </div>
         <div class="active-filters" id="activeFilters"></div>
@@ -490,7 +492,15 @@ export class SmartSearchVisual implements IVisual {
     if (clearBtn) clearBtn.title = this.t.clearTitle;
 
     const header = this.container.querySelector('#suggestionsHeader') as HTMLElement;
-    if (header) header.textContent = this.t.suggestions;
+    if (header) {
+      // Update only the text node, preserving the child .searching-dots span
+      const textNode = header.firstChild;
+      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        textNode.textContent = this.t.suggestions;
+      } else {
+        header.insertBefore(document.createTextNode(this.t.suggestions), header.firstChild);
+      }
+    }
 
     const landingTitle = this.container.querySelector('.landing-title') as HTMLElement;
     if (landingTitle) landingTitle.textContent = this.t.landingTitle;
@@ -622,12 +632,25 @@ export class SmartSearchVisual implements IVisual {
     this.inputEl.addEventListener('input', () => {
       const val = this.inputEl.value;
       clearTimeout(this.debounceTimer);
+      if (val.trim().length >= 1) this.showSearchingState();
       this.debounceTimer = setTimeout(() => {
         this.renderSuggestions(val.trim());
       }, 150);
     });
 
     this.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const dropdownVisible = this.dropdownEl.classList.contains('visible');
+        if (dropdownVisible) {
+          // 1º Esc: fecha o dropdown
+          this.hideDropdown();
+        } else if (this.activeFilters.length > 0) {
+          // 2º Esc (dropdown já fechado): limpa todos os filtros
+          this.clearAllFilters();
+        }
+        return;
+      }
+
       const items = this.dropdownEl.querySelectorAll<HTMLElement>('.suggestion-item');
       if (!items.length) return;
       if (e.key === 'ArrowDown') {
@@ -641,8 +664,6 @@ export class SmartSearchVisual implements IVisual {
       } else if (e.key === 'Enter' && this.focusedIndex >= 0) {
         e.preventDefault();
         items[this.focusedIndex].click();
-      } else if (e.key === 'Escape') {
-        this.hideDropdown();
       }
     });
 
@@ -699,12 +720,15 @@ export class SmartSearchVisual implements IVisual {
         .sort();
 
       if (matches.length > 0) {
-        grouped[field.fieldName] = matches.slice(0, maxPerField).map(v => ({
+        const sliced = matches.slice(0, maxPerField).map(v => ({
           value: v,
           fieldName: field.fieldName,
           columnName: field.columnName,
-          tableName: field.tableName
+          tableName: field.tableName,
+          fieldType: field.fieldType
         }));
+        (sliced as any)._totalCount = matches.length;
+        grouped[field.fieldName] = sliced;
       }
     }
 
@@ -718,12 +742,16 @@ export class SmartSearchVisual implements IVisual {
 
     for (const fieldName of keys) {
       const suggestions = grouped[fieldName];
+      const totalCount = (suggestions as any)._totalCount as number;
+      const countLabel = totalCount > suggestions.length
+        ? `${suggestions.length} de ${totalCount}`
+        : `${suggestions.length}`;
       const group = document.createElement('div');
       group.className = 'suggestion-group';
       group.innerHTML = `
         <div class="group-label">
           ${this.escapeHtml(fieldName)}
-          <span class="group-count">${suggestions.length}</span>
+          <span class="group-count">${countLabel}</span>
         </div>
       `;
 
@@ -733,10 +761,22 @@ export class SmartSearchVisual implements IVisual {
         item.title = sug.value;
         const highlighted = this.highlightMatch(sug.value, query);
         item.innerHTML = `
+          <span class="field-type-icon">${this.getFieldTypeIcon(sug.fieldType)}</span>
           <span class="full-value">${highlighted}</span>
           <span class="item-field-hint">→ ${this.escapeHtml(sug.fieldName)}</span>
         `;
-        item.addEventListener('click', () => this.applyFilter(sug));
+        item.addEventListener('mousedown', (e: MouseEvent) => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.applyFilterMulti(sug);
+          }
+        });
+        item.addEventListener('click', (e: MouseEvent) => {
+          if (!e.ctrlKey && !e.metaKey) {
+            this.applyFilter(sug);
+          }
+        });
         group.appendChild(item);
       }
 
@@ -767,39 +807,156 @@ export class SmartSearchVisual implements IVisual {
     this.sendFilters();
   }
 
+  // ── Apply filter (Ctrl+Click — mantém dropdown aberto) ────
+  private applyFilterMulti(sug: Suggestion): void {
+    const alreadyExists = this.activeFilters.find(
+      f => f.fieldName === sug.fieldName && f.value === sug.value
+    );
+    if (alreadyExists) return;
+
+    this.activeFilters.push({
+      fieldName: sug.fieldName,
+      columnName: sug.columnName,
+      tableName: sug.tableName,
+      value: sug.value,
+      id: `${sug.tableName}_${sug.columnName}_${Date.now()}`
+    });
+
+    this.renderTags();
+    this.sendFilters();
+    // Re-renderiza sugestões para remover o item recém-adicionado
+    this.renderSuggestions(this.inputEl.value.trim());
+  }
+
   // ── Render filter tags ────────────────────────
   private renderTags(): void {
     const tagsEl = this.container.querySelector('#activeFilters') as HTMLElement;
     tagsEl.innerHTML = '';
 
+    // Fechar qualquer popup aberto ao re-renderizar
+    const existingPopup = this.container.querySelector('.tag-popup');
+    if (existingPopup) existingPopup.remove();
+
+    // Agrupar filtros por fieldName
+    const grouped = new Map<string, ActiveFilter[]>();
     for (const af of this.activeFilters) {
+      if (!grouped.has(af.fieldName)) grouped.set(af.fieldName, []);
+      grouped.get(af.fieldName)!.push(af);
+    }
+
+    for (const [fieldName, filters] of grouped) {
       const tag = document.createElement('div');
       tag.className = 'filter-tag';
-      tag.title = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
 
-      const label = document.createElement('span');
-      label.className = 'tag-label';
-      label.textContent = this.fmt.showFieldName
-        ? `${af.fieldName}: ${af.value}`
-        : af.value;
+      if (filters.length === 1) {
+        // Tag simples — comportamento original
+        const af = filters[0];
+        tag.title = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
 
-      const remove = document.createElement('span');
-      remove.className = 'tag-remove';
-      remove.innerHTML = '&#x2715;';
-      remove.title = this.t.removeFilter;
-      remove.addEventListener('click', () => this.removeFilter(af.id));
+        const label = document.createElement('span');
+        label.className = 'tag-label';
+        label.textContent = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
 
-      tag.appendChild(label);
-      tag.appendChild(remove);
+        const remove = document.createElement('span');
+        remove.className = 'tag-remove';
+        remove.innerHTML = '&#x2715;';
+        remove.title = this.t.removeFilter;
+        remove.addEventListener('click', () => this.removeFilter(af.id));
+
+        tag.appendChild(label);
+        tag.appendChild(remove);
+      } else {
+        // Tag agrupada — mostra campo + contagem, popup ao clicar
+        tag.title = `${fieldName}: ${filters.map(f => f.value).join(', ')}`;
+        tag.style.cursor = 'pointer';
+
+        const label = document.createElement('span');
+        label.className = 'tag-label';
+        label.textContent = `${fieldName} (${filters.length})`;
+
+        const remove = document.createElement('span');
+        remove.className = 'tag-remove';
+        remove.innerHTML = '&#x2715;';
+        remove.title = this.t.removeFilter;
+        remove.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.activeFilters = this.activeFilters.filter(f => f.fieldName !== fieldName);
+          this.renderTags();
+          if (this.activeFilters.length === 0) this.clearAllFilters();
+          else this.sendFilters();
+        });
+
+        tag.addEventListener('click', () => this.toggleTagPopup(tag, filters, fieldName));
+
+        tag.appendChild(label);
+        tag.appendChild(remove);
+      }
+
       tagsEl.appendChild(tag);
     }
 
     this.clearBtn.classList.toggle('visible', this.activeFilters.length > 0);
 
-    // Reposition dropdown if it's currently visible (tags changed while dropdown open)
+    // Reposicionar dropdown se estiver visível
     if (this.dropdownEl.classList.contains('visible')) {
       this.updateDropdownPosition();
     }
+  }
+
+  // ── Popup de valores individuais de uma tag agrupada ──
+  private toggleTagPopup(tagEl: HTMLElement, filters: ActiveFilter[], fieldName: string): void {
+    // Se já existe popup para este campo, fecha (toggle)
+    const existing = this.container.querySelector('.tag-popup') as HTMLElement;
+    if (existing) {
+      existing.remove();
+      if (existing.getAttribute('data-field') === fieldName) return;
+    }
+
+    const tagsEl = this.container.querySelector('#activeFilters') as HTMLElement;
+
+    const popup = document.createElement('div');
+    popup.className = 'tag-popup';
+    popup.setAttribute('data-field', fieldName);
+
+    for (const af of filters) {
+      const item = document.createElement('div');
+      item.className = 'tag-popup-item';
+
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'popup-value';
+      valueSpan.textContent = af.value;
+
+      const removeSpan = document.createElement('span');
+      removeSpan.className = 'popup-remove';
+      removeSpan.innerHTML = '&#x2715;';
+      removeSpan.title = this.t.removeFilter;
+      removeSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.removeFilter(af.id);
+        popup.remove();
+      });
+
+      item.appendChild(valueSpan);
+      item.appendChild(removeSpan);
+      popup.appendChild(item);
+    }
+
+    // Posicionar abaixo da tag, relativo ao tagsEl
+    tagsEl.style.position = 'relative';
+    tagsEl.appendChild(popup);
+    const tagRect = tagEl.getBoundingClientRect();
+    const containerRect = tagsEl.getBoundingClientRect();
+    popup.style.left = `${tagRect.left - containerRect.left}px`;
+    popup.style.top  = `${tagRect.bottom - containerRect.top + 4}px`;
+
+    // Fechar ao clicar fora
+    const closeHandler = (e: MouseEvent) => {
+      if (!popup.contains(e.target as Node) && !tagEl.contains(e.target as Node)) {
+        popup.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
   }
 
   // Slots declarados no capabilities.json para múltiplos filtros simultâneos
@@ -911,7 +1068,16 @@ export class SmartSearchVisual implements IVisual {
     this.dropdownEl.style.top = `${top}px`;
   }
 
+  private showSearchingState(): void {
+    const header = this.dropdownEl.querySelector('#suggestionsHeader') as HTMLElement;
+    if (header) header.classList.add('searching');
+    this.updateDropdownPosition();
+    this.dropdownEl.classList.add('visible');
+  }
+
   private showDropdown(): void {
+    const header = this.dropdownEl.querySelector('#suggestionsHeader') as HTMLElement;
+    if (header) header.classList.remove('searching');
     this.updateDropdownPosition();
     this.dropdownEl.classList.add('visible');
   }
@@ -927,6 +1093,18 @@ export class SmartSearchVisual implements IVisual {
     const escaped = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return escaped.replace(new RegExp(`(${escapedQuery})`, 'gi'), '<span class="match-text">$1</span>');
+  }
+
+  // ── Field type icon ───────────────────────────
+  private getFieldTypeIcon(type: 'text' | 'numeric' | 'date'): string {
+    if (type === 'numeric') {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><text x="0" y="13" font-size="11" font-family="Segoe UI,sans-serif" font-weight="600">123</text></svg>`;
+    }
+    if (type === 'date') {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="1.5"/><line x1="2" y1="7" x2="14" y2="7"/><line x1="5" y1="1.5" x2="5" y2="4.5"/><line x1="11" y1="1.5" x2="11" y2="4.5"/></svg>`;
+    }
+    // text (default)
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><text x="0" y="12" font-size="12" font-family="Segoe UI,sans-serif" font-weight="600">Aa</text></svg>`;
   }
 
   // ── Escape HTML ───────────────────────────────
@@ -990,6 +1168,10 @@ export class SmartSearchVisual implements IVisual {
       const columnName = parts[1] || col.displayName; // nome real da coluna no modelo
       const fieldName = col.displayName;              // nome de exibição (pode ser renomeado)
 
+      let fieldType: 'text' | 'numeric' | 'date' = 'text';
+      if (col.type?.numeric) fieldType = 'numeric';
+      else if ((col.type as any)?.dateTime || (col.type as any)?.date) fieldType = 'date';
+
       const uniqueValues = new Set<string>();
       for (const row of rows) {
         const cell = row[colIdx];
@@ -999,7 +1181,7 @@ export class SmartSearchVisual implements IVisual {
         }
       }
 
-      this.fields.push({ fieldName, columnName, tableName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx });
+      this.fields.push({ fieldName, columnName, tableName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx, fieldType });
     }
 
     this.rawRows = rows.map(row => {
@@ -1015,7 +1197,7 @@ export class SmartSearchVisual implements IVisual {
     });
 
     // Start dynamic placeholder rotation if no custom placeholder
-    const hasCustomPlaceholder = this.fmt.placeholder !== DEFAULT_FORMAT.placeholder;
+    const hasCustomPlaceholder = this.fmt.placeholder !== this.t.placeholder;
     if (!hasCustomPlaceholder && this.fields.length > 0) {
       this.startPlaceholderRotation();
     } else {
