@@ -1,0 +1,24 @@
+{
+  "visual": {
+    "name": "SmartSearchVisual",
+    "displayName": "Global Search",
+    "guid": "SmartSearchVisual1A2B3C4D5E6F",
+    "visualClassName": "SmartSearchVisual",
+    "version": "1.0.0.0",
+    "description": "Universal search field with categorized suggestions, cascade filtering, and filter tags for Power BI",
+    "supportUrl": "https://www.linkedin.com/in/diegodias93/",
+    "gitHubUrl": ""
+  },
+  "apiVersion": "5.9.0",
+  "author": {
+    "name": "Diego Dias",
+    "email": "dev@example.com"
+  },
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "externalJS": [],
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "stringResources": []
+}

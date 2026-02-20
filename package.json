@@ -1,0 +1,17 @@
+{
+  "name": "smart-search-visual",
+  "version": "1.0.0",
+  "description": "Smart Search Visual para Power BI",
+  "scripts": {
+    "pbiviz": "pbiviz",
+    "start": "pbiviz start",
+    "package": "pbiviz package"
+  },
+  "dependencies": {
+    "powerbi-visuals-api": "~5.9.0"
+  },
+  "devDependencies": {
+    "powerbi-visuals-tools": "^7.0.0",
+    "typescript": "^5.0.0"
+  }
+}
