@@ -182,6 +182,33 @@
         }
       }
     },
+    "searchConfig": {
+      "displayName": "Configuration",
+      "properties": {
+        "searchMode": {
+          "displayName": "Search Mode",
+          "type": {
+            "enumeration": [
+              { "value": "contains",   "displayName": "Contains" },
+              { "value": "startsWith", "displayName": "Starts With" },
+              { "value": "equals",     "displayName": "Equals" }
+            ]
+          }
+        },
+        "ignoreAccents": {
+          "displayName": "Ignore Accents",
+          "type": { "bool": true }
+        },
+        "caseSensitive": {
+          "displayName": "Case Sensitive",
+          "type": { "bool": true }
+        },
+        "showDiagnostics": {
+          "displayName": "Show Metrics",
+          "type": { "bool": true }
+        }
+      }
+    },
     "tags": {
       "displayName": "Filter Tags",
       "properties": {

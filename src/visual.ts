@@ -75,6 +75,17 @@ interface I18nStrings {
   fp_tagTextColor: string;
   fp_tagFontSize: string;
   fp_showFieldName: string;
+  // Configuration card
+  fp_searchConfig: string;
+  fp_searchBehavior: string;
+  fp_searchMode: string;
+  fp_ignoreAccents: string;
+  fp_caseSensitive: string;
+  fp_diagnostics: string;
+  fp_showDiagnostics: string;
+  // ARIA / accessibility
+  filterApplied: string;
+  allFiltersCleared: string;
 }
 
 const I18N: Record<string, I18nStrings> = {
@@ -133,6 +144,15 @@ const I18N: Record<string, I18nStrings> = {
     fp_tagTextColor:     "Cor do Texto da Tag",
     fp_tagFontSize:      "Tamanho da Fonte da Tag",
     fp_showFieldName:    "Mostrar Nome do Campo na Tag",
+    fp_searchConfig:     "Configuração",
+    fp_searchBehavior:   "Comportamento da Busca",
+    fp_searchMode:       "Modo de Busca",
+    fp_ignoreAccents:    "Ignorar Acentos",
+    fp_caseSensitive:    "Diferenciar Maiúsculas/Minúsculas",
+    fp_diagnostics:      "Diagnóstico",
+    fp_showDiagnostics:  "Mostrar Métricas",
+    filterApplied:       "Filtro aplicado",
+    allFiltersCleared:   "Todos os filtros removidos",
   },
   "es": {
     placeholder:  "Buscar en todos los campos...",
@@ -189,6 +209,15 @@ const I18N: Record<string, I18nStrings> = {
     fp_tagTextColor:     "Color de Texto de Etiqueta",
     fp_tagFontSize:      "Tamaño de Fuente de Etiqueta",
     fp_showFieldName:    "Mostrar Nombre de Campo en Etiqueta",
+    fp_searchConfig:     "Configuración",
+    fp_searchBehavior:   "Comportamiento de Búsqueda",
+    fp_searchMode:       "Modo de Búsqueda",
+    fp_ignoreAccents:    "Ignorar Acentos",
+    fp_caseSensitive:    "Distinguir Mayúsculas/Minúsculas",
+    fp_diagnostics:      "Diagnóstico",
+    fp_showDiagnostics:  "Mostrar Métricas",
+    filterApplied:       "Filtro aplicado",
+    allFiltersCleared:   "Todos los filtros eliminados",
   },
   "en": {
     placeholder:  "Search in all fields...",
@@ -245,6 +274,15 @@ const I18N: Record<string, I18nStrings> = {
     fp_tagTextColor:     "Tag Text Color",
     fp_tagFontSize:      "Tag Font Size",
     fp_showFieldName:    "Show Field Name in Tag",
+    fp_searchConfig:     "Configuration",
+    fp_searchBehavior:   "Search Behavior",
+    fp_searchMode:       "Search Mode",
+    fp_ignoreAccents:    "Ignore Accents",
+    fp_caseSensitive:    "Case Sensitive",
+    fp_diagnostics:      "Diagnostics",
+    fp_showDiagnostics:  "Show Metrics",
+    filterApplied:       "Filter applied",
+    allFiltersCleared:   "All filters cleared",
   }
 };
 
@@ -320,6 +358,11 @@ interface FormatSettings {
   // Appearance
   theme: string;
   language: string;
+  // Search Configuration
+  searchMode: string;
+  ignoreAccents: boolean;
+  caseSensitive: boolean;
+  showDiagnostics: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -392,7 +435,11 @@ const DEFAULT_FORMAT: FormatSettings = {
   tagFontSize: 12,
   showFieldName: true,
   theme: "blackwhite",
-  language: "auto"
+  language: "auto",
+  searchMode: "contains",
+  ignoreAccents: true,
+  caseSensitive: false,
+  showDiagnostics: false,
 };
 
 // ─────────────────────────────────────────────
@@ -419,6 +466,15 @@ function getValue<T>(objects: DataViewObjects, objectName: string, propertyName:
 // ─────────────────────────────────────────────
 // Main class
 // ─────────────────────────────────────────────
+interface PerfMetrics {
+  lastQueryMs: number;
+  rowCount: number;
+  fieldCount: number;
+  matchCount: number;
+  renderCount: number;
+}
+
+// ─────────────────────────────────────────────
 export class SmartSearchVisual implements IVisual {
   private host: IVisualHost;
   private container: HTMLElement;
@@ -431,12 +487,14 @@ export class SmartSearchVisual implements IVisual {
   private placeholderIndex: number = 0;
   private fmt: FormatSettings = { ...DEFAULT_FORMAT };
   private t: I18nStrings = I18N["en"];
+  private perf: PerfMetrics = { lastQueryMs: 0, rowCount: 0, fieldCount: 0, matchCount: 0, renderCount: 0 };
 
   // DOM elements
   private inputEl: HTMLInputElement;
   private dropdownEl: HTMLElement;
   private clearBtn: HTMLElement;
   private searchIcon: HTMLElement;
+  private liveRegion: HTMLElement;
 
   constructor(options: VisualConstructorOptions) {
     this.host = options.host;
@@ -450,21 +508,28 @@ export class SmartSearchVisual implements IVisual {
     this.container.innerHTML = `
       <div class="smart-search-container" id="ssc">
         <div class="search-wrapper">
-          <span class="search-icon" id="searchIcon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="22" y2="22"/></svg></span>
+          <span class="search-icon" id="searchIcon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="22" y2="22"/></svg></span>
           <input
             class="search-input"
             id="searchInput"
             type="text"
             autocomplete="off"
             spellcheck="false"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="suggestionsList"
+            aria-activedescendant=""
           />
-          <button class="clear-btn" id="clearBtn" title="${this.t.clearTitle}">&#x2715;</button>
+          <button class="clear-btn" id="clearBtn" title="${this.t.clearTitle}" aria-label="${this.t.clearTitle}">&#x2715;</button>
         </div>
-        <div class="suggestions-dropdown" id="suggestionsDropdown">
-          <div class="suggestions-header" id="suggestionsHeader">${this.t.suggestions}<span class="searching-dots"><span>.</span><span>.</span><span>.</span></span></div>
+        <div class="suggestions-dropdown" id="suggestionsDropdown" role="listbox" aria-label="${this.t.suggestions}">
+          <div class="suggestions-header" id="suggestionsHeader" aria-hidden="true">${this.t.suggestions}<span class="searching-dots"><span>.</span><span>.</span><span>.</span></span></div>
           <div id="suggestionsList"></div>
         </div>
-        <div class="active-filters" id="activeFilters"></div>
+        <div class="active-filters" id="activeFilters" role="list" aria-label="Filtros ativos"></div>
+        <div id="ssLiveRegion" role="status" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap"></div>
       </div>
       <div id="landingPage" class="landing-page">
         <div class="landing-icon"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="15.5" y1="15.5" x2="22" y2="22"/></svg></div>
@@ -482,6 +547,7 @@ export class SmartSearchVisual implements IVisual {
     this.dropdownEl = this.container.querySelector('#suggestionsDropdown') as HTMLElement;
     this.clearBtn   = this.container.querySelector('#clearBtn') as HTMLElement;
     this.searchIcon = this.container.querySelector('#searchIcon') as HTMLElement;
+    this.liveRegion = this.container.querySelector('#ssLiveRegion') as HTMLElement;
 
     this.bindEvents();
   }
@@ -489,18 +555,26 @@ export class SmartSearchVisual implements IVisual {
   // ── Update DOM text strings when language changes ────────────
   private updateDOMStrings(): void {
     const clearBtn = this.container.querySelector('#clearBtn') as HTMLElement;
-    if (clearBtn) clearBtn.title = this.t.clearTitle;
+    if (clearBtn) {
+      clearBtn.title = this.t.clearTitle;
+      clearBtn.setAttribute('aria-label', this.t.clearTitle);
+    }
 
     const header = this.container.querySelector('#suggestionsHeader') as HTMLElement;
     if (header) {
-      // Update only the text node, preserving the child .searching-dots span
-      const textNode = header.firstChild;
-      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-        textNode.textContent = this.t.suggestions;
+      // Find the text node explicitly (firstChild may be diag-label span)
+      let textNode: ChildNode | null = null;
+      header.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) textNode = n; });
+      if (textNode) {
+        (textNode as Text).textContent = this.t.suggestions;
       } else {
         header.insertBefore(document.createTextNode(this.t.suggestions), header.firstChild);
       }
     }
+
+    // Update dropdown aria-label
+    const dropdown = this.container.querySelector('#suggestionsDropdown') as HTMLElement;
+    if (dropdown) dropdown.setAttribute('aria-label', this.t.suggestions);
 
     const landingTitle = this.container.querySelector('.landing-title') as HTMLElement;
     if (landingTitle) landingTitle.textContent = this.t.landingTitle;
@@ -560,6 +634,13 @@ export class SmartSearchVisual implements IVisual {
       ? dataView.metadata.objects
       : {} as DataViewObjects;
 
+    // Resolve language FIRST so this.t is correct before reading placeholder default
+    const rawLang = getValue(objects, 'appearance', 'language', DEFAULT_FORMAT.language) as string;
+    const lang = rawLang === "auto"
+      ? (this.host.locale ? this.host.locale.split("-")[0].toLowerCase() : "en")
+      : rawLang;
+    this.t = I18N[lang] || I18N["en"];
+
     this.fmt = {
       placeholder:      getValue(objects, 'searchBox', 'placeholder',      this.t.placeholder),
       borderColor:      getValue(objects, 'searchBox', 'borderColor',      DEFAULT_FORMAT.borderColor),
@@ -596,13 +677,12 @@ export class SmartSearchVisual implements IVisual {
 
       theme:    getValue(objects, 'appearance', 'theme',    DEFAULT_FORMAT.theme),
       language: getValue(objects, 'appearance', 'language', DEFAULT_FORMAT.language),
-    };
 
-    // Update i18n based on language setting
-    const lang = this.fmt.language === "auto"
-      ? (this.host.locale ? this.host.locale.split("-")[0].toLowerCase() : "en")
-      : this.fmt.language;
-    this.t = I18N[lang] || I18N["en"];
+      searchMode:      getValue(objects, 'searchConfig', 'searchMode',      DEFAULT_FORMAT.searchMode),
+      ignoreAccents:   getValue(objects, 'searchConfig', 'ignoreAccents',   DEFAULT_FORMAT.ignoreAccents),
+      caseSensitive:   getValue(objects, 'searchConfig', 'caseSensitive',   DEFAULT_FORMAT.caseSensitive),
+      showDiagnostics: getValue(objects, 'searchConfig', 'showDiagnostics', DEFAULT_FORMAT.showDiagnostics),
+    };
 
     // Apply theme colors only for properties the user has NOT explicitly customized
     const themeColors = THEMES[this.fmt.theme];
@@ -684,12 +764,35 @@ export class SmartSearchVisual implements IVisual {
 
   // ── Update focus on suggestions ───────────────
   private updateFocus(items: NodeListOf<HTMLElement>): void {
-    items.forEach((item, i) => item.classList.toggle('focused', i === this.focusedIndex));
-    if (this.focusedIndex >= 0) items[this.focusedIndex].scrollIntoView({ block: 'nearest' });
+    items.forEach((item, i) => {
+      const focused = i === this.focusedIndex;
+      item.classList.toggle('focused', focused);
+      item.setAttribute('aria-selected', focused ? 'true' : 'false'); // Issue 1
+    });
+    if (this.focusedIndex >= 0) {
+      const focusedItem = items[this.focusedIndex];
+      focusedItem.scrollIntoView({ block: 'nearest' });
+      this.inputEl.setAttribute('aria-activedescendant', focusedItem.id); // Issue 1
+    }
+  }
+
+  // ── Update diagnostics label in dropdown header (Issue 4) ──
+  private updateDiagLabel(): void {
+    const header = this.dropdownEl.querySelector('#suggestionsHeader') as HTMLElement;
+    if (!header) return;
+    const existing = header.querySelector('.diag-label');
+    if (existing) existing.remove();
+    if (!this.fmt.showDiagnostics) return;
+    const diag = document.createElement('span');
+    diag.className = 'diag-label';
+    diag.setAttribute('aria-hidden', 'true');
+    diag.textContent = `${this.perf.lastQueryMs}ms · ${this.perf.rowCount}r · ${this.perf.matchCount}m`;
+    header.appendChild(diag);
   }
 
   // ── Render suggestions dropdown ───────────────
   private renderSuggestions(query: string): void {
+    const t0 = performance.now(); // Issue 4: perf timing start
     const listEl = this.dropdownEl.querySelector('#suggestionsList') as HTMLElement;
     listEl.innerHTML = '';
     this.focusedIndex = -1;
@@ -699,7 +802,6 @@ export class SmartSearchVisual implements IVisual {
       return;
     }
 
-    const queryNorm = this.normalize(query);
     const maxPerField = Math.max(1, Math.round(this.fmt.maxResults));
     const grouped: { [key: string]: Suggestion[] } = {};
 
@@ -715,8 +817,9 @@ export class SmartSearchVisual implements IVisual {
         .filter(af => af.fieldName === field.fieldName)
         .map(af => af.value);
 
+      // Issue 2+3: use matchesQuery instead of hardcoded .includes()
       const matches = Array.from(compatibleValues)
-        .filter(v => this.normalize(v).includes(queryNorm) && !activeValuesForField.includes(v))
+        .filter(v => this.matchesQuery(v, query) && !activeValuesForField.includes(v))
         .sort();
 
       if (matches.length > 0) {
@@ -734,12 +837,19 @@ export class SmartSearchVisual implements IVisual {
 
     const keys = Object.keys(grouped);
 
+    // Issue 4: update perf metrics
+    this.perf.lastQueryMs = Math.round((performance.now() - t0) * 10) / 10;
+    this.perf.matchCount  = keys.reduce((s, k) => s + grouped[k].length, 0);
+    this.perf.renderCount++;
+
     if (keys.length === 0) {
       listEl.innerHTML = `<div class="no-results">${this.t.noResults} "<strong>${this.escapeHtml(query)}</strong>"</div>`;
       this.showDropdown();
+      this.updateDiagLabel();
       return;
     }
 
+    let optionIndex = 0;
     for (const fieldName of keys) {
       const suggestions = grouped[fieldName];
       const totalCount = (suggestions as any)._totalCount as number;
@@ -749,21 +859,26 @@ export class SmartSearchVisual implements IVisual {
       const group = document.createElement('div');
       group.className = 'suggestion-group';
       group.innerHTML = `
-        <div class="group-label">
+        <div class="group-label" aria-hidden="true">
           ${this.escapeHtml(fieldName)}
           <span class="group-count">${countLabel}</span>
         </div>
       `;
 
       for (const sug of suggestions) {
+        const itemId = `ss-opt-${optionIndex++}`;
         const item = document.createElement('div');
         item.className = 'suggestion-item';
         item.title = sug.value;
+        // Issue 1: ARIA roles for options
+        item.setAttribute('role', 'option');
+        item.setAttribute('id', itemId);
+        item.setAttribute('aria-selected', 'false');
         const highlighted = this.highlightMatch(sug.value, query);
         item.innerHTML = `
-          <span class="field-type-icon">${this.getFieldTypeIcon(sug.fieldType)}</span>
+          <span class="field-type-icon" aria-hidden="true">${this.getFieldTypeIcon(sug.fieldType)}</span>
           <span class="full-value">${highlighted}</span>
-          <span class="item-field-hint">→ ${this.escapeHtml(sug.fieldName)}</span>
+          <span class="item-field-hint" aria-hidden="true">→ ${this.escapeHtml(sug.fieldName)}</span>
         `;
         item.addEventListener('mousedown', (e: MouseEvent) => {
           if (e.ctrlKey || e.metaKey) {
@@ -784,6 +899,7 @@ export class SmartSearchVisual implements IVisual {
     }
 
     this.showDropdown();
+    this.updateDiagLabel(); // Issue 4
   }
 
   // ── Apply filter ──────────────────────────────
@@ -805,6 +921,7 @@ export class SmartSearchVisual implements IVisual {
     this.hideDropdown();
     this.renderTags();
     this.sendFilters();
+    this.announce(`${this.t.filterApplied}: ${sug.value}`); // Issue 1
   }
 
   // ── Apply filter (Ctrl+Click — mantém dropdown aberto) ────
@@ -824,6 +941,7 @@ export class SmartSearchVisual implements IVisual {
 
     this.renderTags();
     this.sendFilters();
+    this.announce(`${this.t.filterApplied}: ${sug.value}`); // Issue 1
     // Re-renderiza sugestões para remover o item recém-adicionado
     this.renderSuggestions(this.inputEl.value.trim());
   }
@@ -851,24 +969,36 @@ export class SmartSearchVisual implements IVisual {
       if (filters.length === 1) {
         // Tag simples — comportamento original
         const af = filters[0];
-        tag.title = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
+        const tagText = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
+        tag.title = tagText;
+        tag.setAttribute('role', 'listitem'); // Issue 1
+        tag.setAttribute('aria-label', tagText); // Issue 1
 
         const label = document.createElement('span');
         label.className = 'tag-label';
-        label.textContent = this.fmt.showFieldName ? `${af.fieldName}: ${af.value}` : af.value;
+        label.textContent = tagText;
 
         const remove = document.createElement('span');
         remove.className = 'tag-remove';
         remove.innerHTML = '&#x2715;';
         remove.title = this.t.removeFilter;
+        remove.setAttribute('role', 'button'); // Issue 1
+        remove.setAttribute('aria-label', `${this.t.removeFilter}: ${af.value}`); // Issue 1
+        remove.setAttribute('tabindex', '0'); // Issue 1
         remove.addEventListener('click', () => this.removeFilter(af.id));
+        remove.addEventListener('keydown', (e: KeyboardEvent) => { // Issue 1
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.removeFilter(af.id); }
+        });
 
         tag.appendChild(label);
         tag.appendChild(remove);
       } else {
         // Tag agrupada — mostra campo + contagem, popup ao clicar
-        tag.title = `${fieldName}: ${filters.map(f => f.value).join(', ')}`;
+        const tagText = `${fieldName}: ${filters.map(f => f.value).join(', ')}`;
+        tag.title = tagText;
         tag.style.cursor = 'pointer';
+        tag.setAttribute('role', 'listitem'); // Issue 1
+        tag.setAttribute('aria-label', tagText); // Issue 1
 
         const label = document.createElement('span');
         label.className = 'tag-label';
@@ -878,12 +1008,24 @@ export class SmartSearchVisual implements IVisual {
         remove.className = 'tag-remove';
         remove.innerHTML = '&#x2715;';
         remove.title = this.t.removeFilter;
+        remove.setAttribute('role', 'button'); // Issue 1
+        remove.setAttribute('aria-label', `${this.t.removeFilter}: ${fieldName}`); // Issue 1
+        remove.setAttribute('tabindex', '0'); // Issue 1
         remove.addEventListener('click', (e) => {
           e.stopPropagation();
           this.activeFilters = this.activeFilters.filter(f => f.fieldName !== fieldName);
           this.renderTags();
           if (this.activeFilters.length === 0) this.clearAllFilters();
           else this.sendFilters();
+        });
+        remove.addEventListener('keydown', (e: KeyboardEvent) => { // Issue 1
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); e.stopPropagation();
+            this.activeFilters = this.activeFilters.filter(f => f.fieldName !== fieldName);
+            this.renderTags();
+            if (this.activeFilters.length === 0) this.clearAllFilters();
+            else this.sendFilters();
+          }
         });
 
         tag.addEventListener('click', () => this.toggleTagPopup(tag, filters, fieldName));
@@ -1020,6 +1162,7 @@ export class SmartSearchVisual implements IVisual {
     this.activeFilters = [];
     this.renderTags();
     this.inputEl.value = '';
+    this.announce(this.t.allFiltersCleared); // Issue 1
     for (const slot of this.FILTER_SLOTS) {
       try {
         this.host.applyJsonFilter(null, "general", slot, FilterAction.remove);
@@ -1073,6 +1216,7 @@ export class SmartSearchVisual implements IVisual {
     if (header) header.classList.add('searching');
     this.updateDropdownPosition();
     this.dropdownEl.classList.add('visible');
+    this.inputEl.setAttribute('aria-expanded', 'true');
   }
 
   private showDropdown(): void {
@@ -1080,19 +1224,49 @@ export class SmartSearchVisual implements IVisual {
     if (header) header.classList.remove('searching');
     this.updateDropdownPosition();
     this.dropdownEl.classList.add('visible');
+    this.inputEl.setAttribute('aria-expanded', 'true');
   }
-  private hideDropdown(): void { this.dropdownEl.classList.remove('visible'); this.focusedIndex = -1; }
 
-  // ── Normalize text for comparison ─────────────
-  private normalize(text: string): string {
-    return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  private hideDropdown(): void {
+    this.dropdownEl.classList.remove('visible');
+    this.focusedIndex = -1;
+    this.inputEl.setAttribute('aria-expanded', 'false');
+    this.inputEl.setAttribute('aria-activedescendant', '');
+  }
+
+  // ── Announce to screen readers ────────────────
+  private announce(message: string): void {
+    if (!this.liveRegion) return;
+    this.liveRegion.textContent = '';
+    // Small timeout ensures screen readers pick up the change
+    setTimeout(() => { this.liveRegion.textContent = message; }, 50);
+  }
+
+  // ── Configurable normalization (Issues 2 & 3) ─
+  private applyNormalization(text: string): string {
+    let t = text;
+    if (!this.fmt.caseSensitive) t = t.toLowerCase();
+    if (this.fmt.ignoreAccents) t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return t;
+  }
+
+  // ── Configurable match (Issue 2) ──────────────
+  private matchesQuery(value: string, query: string): boolean {
+    const v = this.applyNormalization(value);
+    const q = this.applyNormalization(query);
+    switch (this.fmt.searchMode) {
+      case 'startsWith': return v.startsWith(q);
+      case 'equals':     return v === q;
+      default:           return v.includes(q); // contains
+    }
   }
 
   // ── Highlight matched text ────────────────────
   private highlightMatch(text: string, query: string): string {
     const escaped = this.escapeHtml(text);
     const escapedQuery = this.escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return escaped.replace(new RegExp(`(${escapedQuery})`, 'gi'), '<span class="match-text">$1</span>');
+    const flags = this.fmt.caseSensitive ? 'g' : 'gi';
+    return escaped.replace(new RegExp(`(${escapedQuery})`, flags), '<span class="match-text">$1</span>');
   }
 
   // ── Field type icon ───────────────────────────
@@ -1195,6 +1369,10 @@ export class SmartSearchVisual implements IVisual {
       }
       return map;
     });
+
+    // Issue 4: update perf row/field counts
+    this.perf.rowCount   = this.rawRows.length;
+    this.perf.fieldCount = this.fields.length;
 
     // Start dynamic placeholder rotation if no custom placeholder
     const hasCustomPlaceholder = this.fmt.placeholder !== this.t.placeholder;
@@ -1719,7 +1897,76 @@ export class SmartSearchVisual implements IVisual {
       ]
     };
 
-    return { cards: [appearanceCard, searchBoxCard, iconCard, dropdownCard, tagsCard] };
+    const configCard: FormattingCard = {
+      uid: "config_card",
+      displayName: t.fp_searchConfig,
+      revertToDefaultDescriptors: [
+        { objectName: "searchConfig", propertyName: "searchMode" },
+        { objectName: "searchConfig", propertyName: "ignoreAccents" },
+        { objectName: "searchConfig", propertyName: "caseSensitive" },
+        { objectName: "searchConfig", propertyName: "showDiagnostics" }
+      ],
+      groups: [
+        {
+          uid: "config_search_group",
+          displayName: t.fp_searchBehavior,
+          slices: [
+            {
+              uid: "searchMode_slice",
+              displayName: t.fp_searchMode,
+              control: {
+                type: FormattingComponent.Dropdown,
+                properties: {
+                  descriptor: { objectName: "searchConfig", propertyName: "searchMode" },
+                  value: f.searchMode
+                }
+              }
+            },
+            {
+              uid: "ignoreAccents_slice",
+              displayName: t.fp_ignoreAccents,
+              control: {
+                type: FormattingComponent.ToggleSwitch,
+                properties: {
+                  descriptor: { objectName: "searchConfig", propertyName: "ignoreAccents" },
+                  value: f.ignoreAccents
+                }
+              }
+            },
+            {
+              uid: "caseSensitive_slice",
+              displayName: t.fp_caseSensitive,
+              control: {
+                type: FormattingComponent.ToggleSwitch,
+                properties: {
+                  descriptor: { objectName: "searchConfig", propertyName: "caseSensitive" },
+                  value: f.caseSensitive
+                }
+              }
+            }
+          ]
+        },
+        {
+          uid: "config_diag_group",
+          displayName: t.fp_diagnostics,
+          slices: [
+            {
+              uid: "showDiagnostics_slice",
+              displayName: t.fp_showDiagnostics,
+              control: {
+                type: FormattingComponent.ToggleSwitch,
+                properties: {
+                  descriptor: { objectName: "searchConfig", propertyName: "showDiagnostics" },
+                  value: f.showDiagnostics
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    return { cards: [appearanceCard, searchBoxCard, iconCard, dropdownCard, tagsCard, configCard] };
   }
 
   // ── Destructor ────────────────────────────────
