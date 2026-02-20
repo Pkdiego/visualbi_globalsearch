@@ -1,117 +1,84 @@
-# Smart Search Visual – Power BI
+# Global Search – Power BI
 
-Campo de busca universal com sugestões categorizadas por campo.
+**Encontre qualquer informação no seu relatório em segundos.**
 
----
+O **Global Search** adiciona ao Power BI um **campo de busca inteligente e universal**, permitindo que o usuário localize dados rapidamente sem precisar saber onde procurar ou qual filtro usar.
 
-## Como funciona
-
-1. O usuário arrasta qualquer campo para o visual
-2. Ao digitar no input, aparecem sugestões agrupadas por campo:
-   ```
-   N° ORDEM
-     → 1102
-     → 11025
-   
-   N° TRANSAÇÃO
-     → 1102-A
-     → 11022
-   ```
-3. Ao clicar em uma sugestão, o relatório inteiro é filtrado
+Digite um valor, escolha a sugestão e o relatório se ajusta automaticamente.
 
 ---
 
-## Instalação (Pré-requisitos)
+## O que este visual entrega
 
-```bash
-node -v   # precisa ser >= 14
-npm -v    # precisa ser >= 6
-```
-
-### 1. Instalar o Power BI Visuals Tools
-
-```bash
-npm install -g powerbi-visuals-tools
-pbiviz --version   # deve retornar 5.x
-```
-
-### 2. Instalar dependências do projeto
-
-```bash
-cd smart-search-visual
-npm install
-```
-
-### 3. Modo desenvolvimento (hot reload)
-
-```bash
-pbiviz start
-```
-
-Acesse o Power BI Desktop ou Service, vá em **Formato → Visuais → Desenvolver um visual** e ative o visual de desenvolvedor.
-
-### 4. Gerar o arquivo .pbiviz para produção
-
-```bash
-pbiviz package
-```
-
-O arquivo `SmartSearchVisual.1.0.0.pbiviz` será gerado na pasta `dist/`.
-
-### 5. Importar no Power BI
-
-- No Power BI Desktop, clique em `...` no painel de Visualizações
-- **Importar um visual do arquivo**
-- Selecione o `.pbiviz` gerado
+- Busca unificada em **múltiplos campos ao mesmo tempo**
+- Sugestões organizadas e fáceis de entender
+- Aplicação de filtro imediata em todo o relatório
+- Navegação mais simples, mesmo em modelos complexos
+- Melhor experiência para usuários técnicos e não técnicos
 
 ---
 
-## Como usar no relatório
+## Como ele melhora a experiência do relatório
 
-1. Adicione o visual Smart Search ao relatório
-2. **Arraste os campos desejados** para o bucket **"Campos de Busca"**
-   - Exemplo: N° Ordem, N° Transação, Nome Cliente, N° Título, Navio
-3. O placeholder do input mostra quais campos estão ativos
-4. Digite qualquer valor → sugestões aparecem agrupadas por campo
-5. Clique na sugestão para filtrar o relatório inteiro
+Relatórios crescem, acumulam campos e filtros e acabam ficando difíceis de navegar.  
+O Global Search resolve isso ao oferecer **um único ponto de entrada para busca**, reduzindo cliques, erros e confusão.
 
----
+O usuário não precisa:
+- Saber em qual filtro o dado está
+- Entender a estrutura do modelo
+- Ajustar múltiplos slicers
 
-## Campos recomendados para arrastar (SICOF 2026)
-
-| Campo | Tabela |
-|---|---|
-| N° Ordem | ALOCAÇÕES DE RECEITAS |
-| N° Transação | ALOCAÇÕES DE RECEITAS |
-| Nome Cliente | ALOCAÇÕES DE RECEITAS |
-| N° Título | ALOCAÇÕES DE RECEITAS |
-| Navio | ALOCAÇÕES DE RECEITAS |
-| Invoice | ALOCAÇÕES DE RECEITAS |
-| N° Trabalho | ALOCAÇÕES DE RECEITAS |
+Basta pesquisar.
 
 ---
 
-## Personalização (Painel de Formatação)
+## Exemplos de uso
 
-- **Cor Primária**: cor do header e labels (padrão: vermelho escuro `#8a0000`)
-- **Cor de Fundo**: fundo do input
-- **Cor do Texto**: texto do input
-- **Placeholder**: texto de ajuda customizado
-- **Máx. Sugestões por Campo**: limite de itens por grupo (padrão: 5)
+- Digite um **código** e veja sugestões vindas de diferentes campos  
+- Pesquise por um **nome** e encontre todas as ocorrências relevantes  
+- Localize rapidamente um **identificador**, referência ou descrição  
+- Use como ponto central de navegação em dashboards grandes  
+
+Tudo em um único campo de busca.
 
 ---
 
-## Estrutura do Projeto
+## Por que escolher o Global Search
 
-```
-smart-search-visual/
-├── src/
-│   └── visual.ts        ← Lógica principal
-├── style/
-│   └── visual.less      ← Estilos
-├── capabilities.json    ← Data roles e filtros
-├── pbiviz.json          ← Metadados do visual
-├── package.json
-├── tsconfig.json
-└── README.md
-```
+- Deixa o relatório mais limpo e organizado  
+- Substitui vários filtros por uma única interação  
+- Acelera a análise de dados  
+- Reduz a curva de aprendizado do usuário final  
+- Funciona com qualquer tipo de relatório  
+
+---
+
+## Personalização simples e nativa
+
+O visual se integra ao painel de formatação do Power BI, permitindo ajustar:
+
+- Selecionar temas pré-definidos
+- Ajustar tamanhos e cores de texto, plano de fundo, bordas, entre outros estilos 
+- Definir a quantidade de sugestões exibidas
+
+Sem configurações complexas.
+
+---
+
+## 100% gratuito. Sem exceções.
+
+Este visual é e sempre será:
+
+- Totalmente gratuito  
+- Sem planos pagos  
+- Sem licenciamento  
+- Sem limitações ocultas  
+- Sem coleta de dados  
+- Sem dependências externas  
+
+Pode ser usado livremente em ambientes pessoais, corporativos e produtivos.
+
+---
+
+**Global Search**  
+_Uma forma mais simples, rápida e intuitiva de navegar pelos seus dados._
