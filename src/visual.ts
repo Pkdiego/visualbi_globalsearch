@@ -935,7 +935,6 @@ export class SmartSearchVisual implements IVisual {
         item.setAttribute('aria-selected', 'false');
         const highlighted = this.highlightMatch(sug.value, query);
         item.innerHTML = `
-          <span class="field-type-icon" aria-hidden="true">${this.getFieldTypeIcon(sug.fieldType)}</span>
           <span class="full-value">${highlighted}</span>
           <span class="item-field-hint" aria-hidden="true">→ ${this.escapeHtml(sug.fieldName)}</span>
         `;
@@ -1328,17 +1327,6 @@ export class SmartSearchVisual implements IVisual {
     return escaped.replace(new RegExp(`(${escapedQuery})`, flags), '<span class="match-text">$1</span>');
   }
 
-  // ── Field type icon ───────────────────────────
-  private getFieldTypeIcon(type: 'text' | 'numeric' | 'date'): string {
-    if (type === 'numeric') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><text x="0" y="13" font-size="11" font-family="Segoe UI,sans-serif" font-weight="600">123</text></svg>`;
-    }
-    if (type === 'date') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="11" rx="1.5"/><line x1="2" y1="7" x2="14" y2="7"/><line x1="5" y1="1.5" x2="5" y2="4.5"/><line x1="11" y1="1.5" x2="11" y2="4.5"/></svg>`;
-    }
-    // text (default)
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><text x="0" y="12" font-size="12" font-family="Segoe UI,sans-serif" font-weight="600">Aa</text></svg>`;
-  }
 
   // ── Escape HTML ───────────────────────────────
   private escapeHtml(text: string): string {
@@ -1368,6 +1356,19 @@ export class SmartSearchVisual implements IVisual {
     this.updateDOMStrings(); // update i18n text if language changed
     this.applyFormat();
     this.renderTags(); // re-render tags so showFieldName toggle takes effect immediately
+
+    // Dynamically cap dropdown max-height to fit within the visual viewport
+    if (options.viewport) {
+      const ssc = this.container.querySelector('.smart-search-container') as HTMLElement;
+      if (ssc) {
+        const inputHeight = this.fmt.height || 40;
+        const padding = 32; // container padding top+bottom
+        const available = Math.max(80, options.viewport.height - inputHeight - padding - 8);
+        const configured = this.fmt.dropdownMaxHeight || 1000;
+        const effective = Math.min(configured, available);
+        ssc.style.setProperty('--ss-dropdown-max-height', `${effective}px`);
+      }
+    }
 
     const landing = this.container.querySelector('#landingPage') as HTMLElement;
     const searchWrapper = this.container.querySelector('.search-wrapper') as HTMLElement;
@@ -1415,7 +1416,12 @@ export class SmartSearchVisual implements IVisual {
       for (let colIdx = 0; colIdx < columns.length; colIdx++) {
         const cell = row[colIdx];
         if (cell !== null && cell !== undefined) {
-          const str = String(cell).trim();
+          let str: string;
+          if (cell instanceof Date) {
+            str = cell.toLocaleDateString();
+          } else {
+            str = String(cell).trim();
+          }
           if (str.length > 0) map.set(colIdx, str);
         }
       }
