@@ -5,12 +5,14 @@
   "scripts": {
     "pbiviz": "pbiviz",
     "start": "pbiviz start",
-    "package": "pbiviz package"
+    "package": "pbiviz package",
+    "eslint": "npx eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "dependencies": {
     "powerbi-visuals-api": "~5.9.0"
   },
   "devDependencies": {
+    "eslint": "^10.0.1",
     "powerbi-visuals-tools": "^7.0.0",
     "typescript": "^5.0.0"
   }

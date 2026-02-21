@@ -503,6 +503,7 @@ interface PerfMetrics {
 // ─────────────────────────────────────────────
 export class SmartSearchVisual implements IVisual {
   private host: IVisualHost;
+  private events: any; // IVisualEventService
   private container: HTMLElement;
   private fields: FieldData[] = [];
   private rawRows: RawRow[] = [];
@@ -526,6 +527,7 @@ export class SmartSearchVisual implements IVisual {
 
   constructor(options: VisualConstructorOptions) {
     this.host = options.host;
+    this.events = options.host.eventService;
     this.container = options.element;
     this.t = getI18n(options.host.locale);
     this.buildDOM();
@@ -1358,6 +1360,7 @@ export class SmartSearchVisual implements IVisual {
 
   // ── Update: process DataView from Power BI ────
   public update(options: VisualUpdateOptions): void {
+    this.events.renderingStarted(options);
     const dataViews = options.dataViews;
 
     // Always parse and apply format (even without data)
@@ -1384,6 +1387,7 @@ export class SmartSearchVisual implements IVisual {
       if (searchWrapper) searchWrapper.style.display = 'none';
       if (activeFiltersEl) activeFiltersEl.style.display = 'none';
       if (fetchBanner) fetchBanner.style.display = 'none';
+      this.events.renderingFinished(options);
       return;
     }
 
@@ -1478,6 +1482,8 @@ export class SmartSearchVisual implements IVisual {
     if (currentQuery.length > 0 && this.dropdownEl.style.display !== 'none') {
       this.renderSuggestions(currentQuery);
     }
+
+    this.events.renderingFinished(options);
   }
 
   // ── Format Pane Model ─────────────────────────
