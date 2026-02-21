@@ -131,8 +131,8 @@
       .diag-label {
         margin-left: auto;
         font-family: 'Courier New', monospace;
-        font-size: 12px;
-        opacity: 0.55;
+        font-size: 13px;
+        opacity: 0.70;
         letter-spacing: 0;
         white-space: nowrap;
       }
@@ -356,6 +356,40 @@
         svg {
           flex-shrink: 0;
         }
+      }
+    }
+  }
+
+  .fetch-more-banner {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--ss-border-color, #333333) 8%, transparent);
+    font-size: 12px;
+    color: color-mix(in srgb, var(--ss-text-color, #333333) 65%, transparent);
+
+    button {
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--ss-border-color, #333333);
+      background: var(--ss-bg-color, #ffffff);
+      color: var(--ss-text-color, #333333);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+
+      &:hover {
+        background: color-mix(in srgb, var(--ss-border-color, #333333) 12%, var(--ss-bg-color, #ffffff));
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
     }
   }

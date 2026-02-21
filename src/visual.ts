@@ -87,6 +87,13 @@ interface I18nStrings {
   // ARIA / accessibility
   filterApplied: string;
   allFiltersCleared: string;
+  // fetchMore
+  rowsLoaded: string;
+  loadMore: string;
+  // diag tooltips
+  diagMs: string;
+  diagR: string;
+  diagM: string;
 }
 
 const I18N: Record<string, I18nStrings> = {
@@ -155,6 +162,11 @@ const I18N: Record<string, I18nStrings> = {
     fp_showDiagnostics:  "Mostrar Métricas",
     filterApplied:       "Filtro aplicado",
     allFiltersCleared:   "Todos os filtros removidos",
+    rowsLoaded:          "registros carregados",
+    loadMore:            "Carregar mais",
+    diagMs:              "Tempo de execução da última busca",
+    diagR:               "Total de linhas nos campos mapeados para busca",
+    diagM:               "Resultados encontrados para o termo atual",
   },
   "es": {
     placeholder:  "Buscar en todos los campos...",
@@ -221,6 +233,11 @@ const I18N: Record<string, I18nStrings> = {
     fp_showDiagnostics:  "Mostrar Métricas",
     filterApplied:       "Filtro aplicado",
     allFiltersCleared:   "Todos los filtros eliminados",
+    rowsLoaded:          "registros cargados",
+    loadMore:            "Cargar más",
+    diagMs:              "Tiempo de ejecución de la última búsqueda",
+    diagR:               "Total de filas en los campos mapeados para búsqueda",
+    diagM:               "Resultados encontrados para el término actual",
   },
   "en": {
     placeholder:  "Search in all fields...",
@@ -287,6 +304,11 @@ const I18N: Record<string, I18nStrings> = {
     fp_showDiagnostics:  "Show Metrics",
     filterApplied:       "Filter applied",
     allFiltersCleared:   "All filters cleared",
+    rowsLoaded:          "records loaded",
+    loadMore:            "Load more",
+    diagMs:              "Last search execution time",
+    diagR:               "Total rows across all mapped search fields",
+    diagM:               "Results found for current term",
   }
 };
 
@@ -443,7 +465,7 @@ const DEFAULT_FORMAT: FormatSettings = {
   searchMode: "contains",
   ignoreAccents: true,
   caseSensitive: false,
-  showDiagnostics: false,
+  showDiagnostics: true,
 };
 
 // ─────────────────────────────────────────────
@@ -492,6 +514,8 @@ export class SmartSearchVisual implements IVisual {
   private fmt: FormatSettings = { ...DEFAULT_FORMAT };
   private t: I18nStrings = I18N["en"];
   private perf: PerfMetrics = { lastQueryMs: 0, rowCount: 0, fieldCount: 0, matchCount: 0, renderCount: 0 };
+  private isFetchingMore: boolean = false;
+  private totalRowCount: number = 0;
 
   // DOM elements
   private inputEl: HTMLInputElement;
@@ -533,6 +557,10 @@ export class SmartSearchVisual implements IVisual {
           <div id="suggestionsList"></div>
         </div>
         <div class="active-filters" id="activeFilters" role="list" aria-label="Filtros ativos"></div>
+        <div id="fetchMoreBanner" class="fetch-more-banner" style="display:none">
+          <span id="fetchMoreInfo"></span>
+          <button id="fetchMoreBtn" type="button"></button>
+        </div>
         <div id="ssLiveRegion" role="status" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap"></div>
         <div id="landingPage" class="landing-page">
         <div class="landing-icon">
@@ -729,6 +757,7 @@ export class SmartSearchVisual implements IVisual {
     this.inputEl.addEventListener('input', () => {
       const val = this.inputEl.value;
       clearTimeout(this.debounceTimer);
+      this.clearBtn.classList.toggle('visible', val.length > 0 || this.activeFilters.length > 0);
       if (val.trim().length >= 1) this.showSearchingState();
       this.debounceTimer = setTimeout(() => {
         this.renderSuggestions(val.trim());
@@ -774,8 +803,16 @@ export class SmartSearchVisual implements IVisual {
     });
 
     this.clearBtn.addEventListener('click', () => {
-      this.hideDropdown();
-      this.clearAllFilters();
+      if (this.inputEl.value.length > 0) {
+        // Tem texto: só limpa o input e fecha o dropdown
+        this.inputEl.value = '';
+        this.hideDropdown();
+        this.clearBtn.classList.toggle('visible', this.activeFilters.length > 0);
+      } else {
+        // Input vazio: limpa os filtros ativos
+        this.hideDropdown();
+        this.clearAllFilters();
+      }
     });
   }
 
@@ -803,7 +840,10 @@ export class SmartSearchVisual implements IVisual {
     const diag = document.createElement('span');
     diag.className = 'diag-label';
     diag.setAttribute('aria-hidden', 'true');
-    diag.textContent = `${this.perf.lastQueryMs}ms · ${this.perf.rowCount}r · ${this.perf.matchCount}m`;
+    diag.innerHTML =
+      `<span title="${this.t.diagMs}">${this.perf.lastQueryMs}ms</span>` +
+      ` · <span title="${this.t.diagR}">${this.perf.rowCount}L</span>` +
+      ` · <span title="${this.t.diagM}">${this.perf.matchCount}R</span>`;
     header.appendChild(diag);
   }
 
@@ -1054,7 +1094,7 @@ export class SmartSearchVisual implements IVisual {
       tagsEl.appendChild(tag);
     }
 
-    this.clearBtn.classList.toggle('visible', this.activeFilters.length > 0);
+    this.clearBtn.classList.toggle('visible', this.activeFilters.length > 0 || this.inputEl.value.length > 0);
 
     // Reposicionar dropdown se estiver visível
     if (this.dropdownEl.classList.contains('visible')) {
@@ -1329,15 +1369,21 @@ export class SmartSearchVisual implements IVisual {
     const landing = this.container.querySelector('#landingPage') as HTMLElement;
     const searchWrapper = this.container.querySelector('.search-wrapper') as HTMLElement;
     const activeFiltersEl = this.container.querySelector('#activeFilters') as HTMLElement;
+    const fetchBanner = this.container.querySelector('#fetchMoreBanner') as HTMLElement;
+    const fetchInfo = this.container.querySelector('#fetchMoreInfo') as HTMLElement;
+    const fetchBtn = this.container.querySelector('#fetchMoreBtn') as HTMLButtonElement;
 
     if (!dataViews || !dataViews[0] || !dataViews[0].table) {
       this.fields = [];
       this.rawRows = [];
+      this.isFetchingMore = false;
+      this.totalRowCount = 0;
       this.stopPlaceholderRotation();
       this.inputEl.placeholder = this.fmt.placeholder;
       if (landing) landing.style.display = 'flex';
       if (searchWrapper) searchWrapper.style.display = 'none';
       if (activeFiltersEl) activeFiltersEl.style.display = 'none';
+      if (fetchBanner) fetchBanner.style.display = 'none';
       return;
     }
 
@@ -1345,37 +1391,22 @@ export class SmartSearchVisual implements IVisual {
     if (searchWrapper) searchWrapper.style.display = '';
     if (activeFiltersEl) activeFiltersEl.style.display = '';
 
-    const table = dataViews[0].table;
+    const dv = dataViews[0];
+    const table = dv.table;
     const columns = table.columns;
     const rows = table.rows || [];
 
-    this.fields = [];
+    // Detect if this is a continuation segment or a fresh load
+    const hasMoreSegments = (dv.metadata as any)?.segment !== undefined;
 
-    for (let colIdx = 0; colIdx < columns.length; colIdx++) {
-      const col = columns[colIdx];
-      const queryName = col.queryName || '';
-      const parts = queryName.split('.');
-      const tableName = parts[0] || col.displayName;
-      const columnName = parts[1] || col.displayName; // nome real da coluna no modelo
-      const fieldName = col.displayName;              // nome de exibição (pode ser renomeado)
-
-      let fieldType: 'text' | 'numeric' | 'date' = 'text';
-      if (col.type?.numeric) fieldType = 'numeric';
-      else if ((col.type as any)?.dateTime || (col.type as any)?.date) fieldType = 'date';
-
-      const uniqueValues = new Set<string>();
-      for (const row of rows) {
-        const cell = row[colIdx];
-        if (cell !== null && cell !== undefined) {
-          const str = String(cell).trim();
-          if (str.length > 0) uniqueValues.add(str);
-        }
-      }
-
-      this.fields.push({ fieldName, columnName, tableName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx, fieldType });
+    if (!this.isFetchingMore) {
+      // Fresh load — reset accumulated data
+      this.rawRows = [];
+      this.totalRowCount = 0;
     }
 
-    this.rawRows = rows.map(row => {
+    // Accumulate rows from this segment
+    const newRows: RawRow[] = rows.map(row => {
       const map: RawRow = new Map();
       for (let colIdx = 0; colIdx < columns.length; colIdx++) {
         const cell = row[colIdx];
@@ -1386,10 +1417,52 @@ export class SmartSearchVisual implements IVisual {
       }
       return map;
     });
+    this.rawRows = this.isFetchingMore ? [...this.rawRows, ...newRows] : newRows;
+    this.totalRowCount = this.rawRows.length;
+    this.isFetchingMore = false;
 
-    // Issue 4: update perf row/field counts
+    // Rebuild fields from accumulated rawRows
+    this.fields = [];
+    for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+      const col = columns[colIdx];
+      const queryName = col.queryName || '';
+      const parts = queryName.split('.');
+      const tableName = parts[0] || col.displayName;
+      const columnName = parts[1] || col.displayName;
+      const fieldName = col.displayName;
+
+      let fieldType: 'text' | 'numeric' | 'date' = 'text';
+      if (col.type?.numeric) fieldType = 'numeric';
+      else if ((col.type as any)?.dateTime || (col.type as any)?.date) fieldType = 'date';
+
+      const uniqueValues = new Set<string>();
+      for (const row of this.rawRows) {
+        const val = row.get(colIdx);
+        if (val) uniqueValues.add(val);
+      }
+
+      this.fields.push({ fieldName, columnName, tableName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx, fieldType });
+    }
+
+    // Update perf counts
     this.perf.rowCount   = this.rawRows.length;
     this.perf.fieldCount = this.fields.length;
+
+    // Show/hide "load more" banner
+    if (fetchBanner && fetchInfo && fetchBtn) {
+      if (hasMoreSegments) {
+        fetchBanner.style.display = 'flex';
+        fetchInfo.textContent = `${this.rawRows.length.toLocaleString()} ${this.t.rowsLoaded}`;
+        fetchBtn.textContent = this.t.loadMore;
+        fetchBtn.onclick = () => {
+          this.isFetchingMore = true;
+          fetchBtn.disabled = true;
+          this.host.fetchMoreData(false);
+        };
+      } else {
+        fetchBanner.style.display = 'none';
+      }
+    }
 
     // Start dynamic placeholder rotation if no custom placeholder
     const hasCustomPlaceholder = this.fmt.placeholder !== this.t.placeholder;
@@ -1398,6 +1471,12 @@ export class SmartSearchVisual implements IVisual {
     } else {
       this.stopPlaceholderRotation();
       this.inputEl.placeholder = this.fmt.placeholder;
+    }
+
+    // If dropdown is open and has a query, refresh results with updated data
+    const currentQuery = this.inputEl.value.trim();
+    if (currentQuery.length > 0 && this.dropdownEl.style.display !== 'none') {
+      this.renderSuggestions(currentQuery);
     }
   }
 
