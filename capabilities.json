@@ -16,7 +16,7 @@
           },
           "dataReductionAlgorithm": {
             "top": {
-              "count": 30000
+              "count": 50000
             }
           }
         }
@@ -233,5 +233,6 @@
   },
   "supportsHighlight": false,
   "suppressDefaultTitle": true,
+  "supportsLandingPage": true,
   "privileges": []
 }
