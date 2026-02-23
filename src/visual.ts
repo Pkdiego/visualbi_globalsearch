@@ -94,6 +94,10 @@ interface I18nStrings {
   diagMs: string;
   diagR: string;
   diagM: string;
+  // shortcut hints
+  hintCtrlClick: string;
+  hintEsc: string;
+  hintEnter: string;
 }
 
 const I18N: Record<string, I18nStrings> = {
@@ -167,6 +171,9 @@ const I18N: Record<string, I18nStrings> = {
     diagMs:              "Tempo de execução da última busca",
     diagR:               "Total de linhas nos campos mapeados para busca",
     diagM:               "Resultados encontrados para o termo atual",
+    hintCtrlClick:       "seleção múltipla",
+    hintEsc:             "fechar",
+    hintEnter:           "selecionar",
   },
   "es": {
     placeholder:  "Buscar en todos los campos...",
@@ -238,6 +245,9 @@ const I18N: Record<string, I18nStrings> = {
     diagMs:              "Tiempo de ejecución de la última búsqueda",
     diagR:               "Total de filas en los campos mapeados para búsqueda",
     diagM:               "Resultados encontrados para el término actual",
+    hintCtrlClick:       "selección múltiple",
+    hintEsc:             "cerrar",
+    hintEnter:           "seleccionar",
   },
   "en": {
     placeholder:  "Search in all fields...",
@@ -309,6 +319,9 @@ const I18N: Record<string, I18nStrings> = {
     diagMs:              "Last search execution time",
     diagR:               "Total rows across all mapped search fields",
     diagM:               "Results found for current term",
+    hintCtrlClick:       "multi-select",
+    hintEsc:             "close",
+    hintEnter:           "select",
   }
 };
 
@@ -504,6 +517,7 @@ interface PerfMetrics {
 export class SmartSearchVisual implements IVisual {
   private host: IVisualHost;
   private events: any; // IVisualEventService
+  private selectionManager: any; // ISelectionManager
   private container: HTMLElement;
   private fields: FieldData[] = [];
   private rawRows: RawRow[] = [];
@@ -528,9 +542,11 @@ export class SmartSearchVisual implements IVisual {
   constructor(options: VisualConstructorOptions) {
     this.host = options.host;
     this.events = options.host.eventService;
+    this.selectionManager = options.host.createSelectionManager();
     this.container = options.element;
     this.t = getI18n(options.host.locale);
     this.buildDOM();
+    this.bindContextMenu();
   }
 
   // ── Build HTML ────────────────────────────────
@@ -754,6 +770,14 @@ export class SmartSearchVisual implements IVisual {
     }
   }
 
+  // ── Context menu ──────────────────────────────
+  private bindContextMenu(): void {
+    this.container.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault();
+      this.selectionManager.showContextMenu({}, { x: e.clientX, y: e.clientY });
+    });
+  }
+
   // ── Bind events ───────────────────────────────
   private bindEvents(): void {
     this.inputEl.addEventListener('input', () => {
@@ -925,17 +949,19 @@ export class SmartSearchVisual implements IVisual {
       `;
 
       for (const sug of suggestions) {
-        const itemId = `ss-opt-${optionIndex++}`;
+        const itemId = `ss-opt-${optionIndex}`;
         const item = document.createElement('div');
         item.className = 'suggestion-item';
+        item.style.setProperty('--item-index', String(optionIndex));
         item.title = sug.value;
+        optionIndex++;
         // Issue 1: ARIA roles for options
         item.setAttribute('role', 'option');
         item.setAttribute('id', itemId);
         item.setAttribute('aria-selected', 'false');
-        const highlighted = this.highlightMatch(sug.value, query);
+        const snippet = this.buildSnippet(sug.value, query);
         item.innerHTML = `
-          <span class="full-value">${highlighted}</span>
+          <span class="full-value">${snippet}</span>
           <span class="item-field-hint" aria-hidden="true">→ ${this.escapeHtml(sug.fieldName)}</span>
         `;
         item.addEventListener('mousedown', (e: MouseEvent) => {
@@ -955,6 +981,16 @@ export class SmartSearchVisual implements IVisual {
 
       listEl.appendChild(group);
     }
+
+    // Shortcuts hint footer
+    const hint = document.createElement('div');
+    hint.className = 'shortcuts-hint';
+    hint.setAttribute('aria-hidden', 'true');
+    hint.innerHTML =
+      `<span class="shortcut"><kbd>Enter</kbd> ${this.escapeHtml(this.t.hintEnter)}</span>` +
+      `<span class="shortcut"><kbd>Ctrl</kbd>+<kbd>Click</kbd> ${this.escapeHtml(this.t.hintCtrlClick)}</span>` +
+      `<span class="shortcut"><kbd>Esc</kbd> ${this.escapeHtml(this.t.hintEsc)}</span>`;
+    listEl.appendChild(hint);
 
     this.showDropdown();
     this.updateDiagLabel(); // Issue 4
@@ -1325,6 +1361,44 @@ export class SmartSearchVisual implements IVisual {
     const escapedQuery = this.escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const flags = this.fmt.caseSensitive ? 'g' : 'gi';
     return escaped.replace(new RegExp(`(${escapedQuery})`, flags), '<span class="match-text">$1</span>');
+  }
+
+  // ── Build context snippet around match (Google-style) ──
+  private buildSnippet(text: string, query: string): string {
+    const CONTEXT_CHARS = 28;
+    const escaped = this.escapeHtml(text);
+    const escapedQuery = this.escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flags = this.fmt.caseSensitive ? '' : 'i';
+    const match = escaped.match(new RegExp(escapedQuery, flags));
+    if (!match || match.index === undefined) return escaped;
+
+    const idx = match.index;
+    const matchEnd = idx + match[0].length;
+    const totalLen = escaped.length;
+
+    // Short text — just highlight, no ellipsis
+    if (totalLen <= CONTEXT_CHARS * 2 + match[0].length + 6) {
+      return this.highlightMatch(text, query);
+    }
+
+    let start = Math.max(0, idx - CONTEXT_CHARS);
+    let end = Math.min(totalLen, matchEnd + CONTEXT_CHARS);
+    // Snap to word boundaries
+    if (start > 0) {
+      const space = escaped.indexOf(' ', start);
+      if (space !== -1 && space < idx) start = space + 1;
+    }
+    if (end < totalLen) {
+      const space = escaped.lastIndexOf(' ', end);
+      if (space !== -1 && space > matchEnd) end = space;
+    }
+
+    const prefix = start > 0 ? '…' : '';
+    const suffix = end < totalLen ? '…' : '';
+    const slice = escaped.substring(start, end);
+    const highlightFlags = this.fmt.caseSensitive ? 'g' : 'gi';
+    const highlighted = slice.replace(new RegExp(`(${escapedQuery})`, highlightFlags), '<span class="match-text">$1</span>');
+    return `${prefix}${highlighted}${suffix}`;
   }
 
 
