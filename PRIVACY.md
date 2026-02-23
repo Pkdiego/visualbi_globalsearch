@@ -28,4 +28,4 @@ For questions or concerns regarding this privacy policy, please contact:
 
 **Diego Dias**
 Email: diegoimage@gmail.com
-Support: https://github.com/Pkdiego/visualbi_globalsearch/issues
+Support: https://www.newlevel.com.br
