@@ -194,25 +194,18 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        transition: background 0.1s;
+        transition: background 0.1s, opacity 0.2s ease, transform 0.2s ease;
+        // Stagger animation
+        opacity: 0;
+        transform: translateY(-6px);
+        animation: itemSlideIn 0.25s ease forwards;
+        animation-delay: calc(var(--item-index, 0) * 30ms);
 
         &:hover, &.focused {
           background: var(--ss-item-hover-color, #f5f5f5);
           color: var(--ss-group-label-color, #333333);
         }
 
-        .field-type-icon {
-          flex-shrink: 0;
-          opacity: 0.45;
-          display: flex;
-          align-items: center;
-          color: var(--ss-text-color, #333);
-
-          svg {
-            width: 14px;
-            height: 14px;
-          }
-        }
 
         .match-text {
           font-weight: 600;
@@ -244,6 +237,37 @@
       color: color-mix(in srgb, var(--ss-text-color, #333333) 50%, transparent);
       font-size: 12px;
       font-style: italic;
+    }
+
+    .shortcuts-hint {
+      padding: 5px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border-top: 1px solid color-mix(in srgb, var(--ss-border-color, #333333) 12%, transparent);
+      background: color-mix(in srgb, var(--ss-item-hover-color, #f5f5f5) 60%, var(--ss-bg-color, #ffffff));
+
+      .shortcut {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        color: color-mix(in srgb, var(--ss-text-color, #333333) 45%, transparent);
+        white-space: nowrap;
+
+        kbd {
+          display: inline-block;
+          padding: 1px 5px;
+          border-radius: 3px;
+          border: 1px solid color-mix(in srgb, var(--ss-border-color, #333333) 20%, transparent);
+          background: var(--ss-bg-color, #ffffff);
+          font-family: inherit;
+          font-size: 10px;
+          line-height: 1.4;
+          box-shadow: 0 1px 0 color-mix(in srgb, var(--ss-border-color, #333333) 10%, transparent);
+        }
+      }
     }
   }
 
@@ -492,6 +516,11 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+
+@keyframes itemSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes dotPulse {

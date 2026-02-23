@@ -7,16 +7,16 @@
     "version": "1.0.0.0",
     "description": "Universal search field with categorized suggestions, cascade filtering, and filter tags for Power BI",
     "supportUrl": "https://www.linkedin.com/in/diegodias93/",
-    "gitHubUrl": "",
+    "gitHubUrl": "https://github.com/Pkdiego/visualbi_globalsearch",
     "defaultViewport": {
       "width": 280,
       "height": 415
     }
   },
-  "apiVersion": "5.9.0",
+  "apiVersion": "5.10.0",
   "author": {
     "name": "Diego Dias",
-    "email": "dev@example.com"
+    "email": "diegoimage@gmail.com"
   },
   "assets": {
     "icon": "assets/icon.png"
