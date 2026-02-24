@@ -4,7 +4,7 @@
     "displayName": "Global Search",
     "guid": "GlobalSearch1A2B3C4D5E6F",
     "visualClassName": "SmartSearchVisual",
-    "version": "1.0.0.0",
+    "version": "1.0.2.0",
     "description": "Universal search field with categorized suggestions, cascade filtering, and filter tags for Power BI",
     "supportUrl": "https://www.linkedin.com/in/diegodias93/",
     "gitHubUrl": "https://github.com/Pkdiego/visualbi_globalsearch",

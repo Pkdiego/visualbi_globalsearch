@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"/c/Users/DiegoMenezesDias/OneDrive - CAMORIM SERVICOS MARITIMOS LTDA/Área de Trabalho/visualbi_globalsearch\" && npm run package 2>&1)",
+      "Bash(cd \"/c/Users/DiegoMenezesDias/OneDrive - CAMORIM SERVICOS MARITIMOS LTDA/Área de Trabalho/visualbi_globalsearch\" && npx pbiviz package 2>&1)",
+      "Bash(cd \"/c/Users/DiegoMenezesDias/OneDrive - CAMORIM SERVICOS MARITIMOS LTDA/Área de Trabalho/visualbi_globalsearch\" && npm install 2>&1 && ./node_modules/.bin/pbiviz package 2>&1)",
+      "Bash(cd \"/c/Users/DiegoMenezesDias/OneDrive - CAMORIM SERVICOS MARITIMOS LTDA/Área de Trabalho/visualbi_globalsearch\" && ./node_modules/.bin/pbiviz package 2>&1)"
+    ]
+  }
+}
