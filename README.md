@@ -80,5 +80,21 @@ Pode ser usado livremente em ambientes pessoais, corporativos e produtivos.
 
 ---
 
-**Global Search**  
+**Global Search**
 _Uma forma mais simples, rápida e intuitiva de navegar pelos seus dados._
+
+---
+
+## Notas de atualização
+
+### v1.0.3.0
+- **Selecionar todos por grupo** — novo botão no cabeçalho de cada grupo de sugestões permite selecionar todos os valores correspondentes de um campo com um único clique, sem precisar usar Ctrl+Click repetidamente
+- **Suporte a até 25 campos simultâneos** — limite de colunas aumentado de 10 para 25
+- **Correção i18n** — contador de resultados por grupo ("5 de 20") agora traduzido corretamente em inglês e espanhol
+- **Correção acessibilidade** — rótulo da área de filtros ativos traduzido conforme o idioma configurado
+
+### v1.0.2.0
+- Modos de busca configuráveis: Contém, Começa com, Igual
+- Normalização de acentos e diferenciação de maiúsculas/minúsculas
+- Métricas de performance (diagnóstico)
+- Acessibilidade completa (ARIA + teclado)

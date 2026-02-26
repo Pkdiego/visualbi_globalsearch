@@ -98,6 +98,10 @@ interface I18nStrings {
   hintCtrlClick: string;
   hintEsc: string;
   hintEnter: string;
+  // misc
+  of: string;
+  activeFiltersLabel: string;
+  selectAll: string;
 }
 
 const I18N: Record<string, I18nStrings> = {
@@ -174,6 +178,9 @@ const I18N: Record<string, I18nStrings> = {
     hintCtrlClick:       "seleção múltipla",
     hintEsc:             "fechar",
     hintEnter:           "selecionar",
+    of:                  "de",
+    activeFiltersLabel:  "Filtros ativos",
+    selectAll:           "Selecionar todos",
   },
   "es": {
     placeholder:  "Buscar en todos los campos...",
@@ -248,6 +255,9 @@ const I18N: Record<string, I18nStrings> = {
     hintCtrlClick:       "selección múltiple",
     hintEsc:             "cerrar",
     hintEnter:           "seleccionar",
+    of:                  "de",
+    activeFiltersLabel:  "Filtros activos",
+    selectAll:           "Seleccionar todos",
   },
   "en": {
     placeholder:  "Search in all fields...",
@@ -322,6 +332,9 @@ const I18N: Record<string, I18nStrings> = {
     hintCtrlClick:       "multi-select",
     hintEsc:             "close",
     hintEnter:           "select",
+    of:                  "of",
+    activeFiltersLabel:  "Active filters",
+    selectAll:           "Select all",
   }
 };
 
@@ -574,7 +587,7 @@ export class SmartSearchVisual implements IVisual {
           <div class="suggestions-header" id="suggestionsHeader" aria-hidden="true">${this.t.suggestions}<span class="searching-dots"><span>.</span><span>.</span><span>.</span></span></div>
           <div id="suggestionsList"></div>
         </div>
-        <div class="active-filters" id="activeFilters" role="list" aria-label="Filtros ativos"></div>
+        <div class="active-filters" id="activeFilters" role="list" aria-label="${this.t.activeFiltersLabel}"></div>
         <div id="fetchMoreBanner" class="fetch-more-banner" style="display:none">
           <span id="fetchMoreInfo"></span>
           <button id="fetchMoreBtn" type="button"></button>
@@ -648,6 +661,9 @@ export class SmartSearchVisual implements IVisual {
 
     const landingFreeEl = this.container.querySelector('#landingFreeText') as HTMLElement;
     if (landingFreeEl) landingFreeEl.textContent = this.t.landingFree;
+
+    const activeFiltersEl = this.container.querySelector('#activeFilters') as HTMLElement;
+    if (activeFiltersEl) activeFiltersEl.setAttribute('aria-label', this.t.activeFiltersLabel);
   }
 
   // ── Apply format settings to DOM via CSS custom properties ──
@@ -887,6 +903,7 @@ export class SmartSearchVisual implements IVisual {
 
     const maxPerField = Math.max(1, Math.round(this.fmt.maxResults));
     const grouped: { [key: string]: Suggestion[] } = {};
+    const allMatches: { [key: string]: Suggestion[] } = {};
 
     for (const field of this.fields) {
       const compatibleRows = this.getFilteredRows(field.fieldName);
@@ -906,15 +923,17 @@ export class SmartSearchVisual implements IVisual {
         .sort();
 
       if (matches.length > 0) {
-        const sliced = matches.slice(0, maxPerField).map(v => ({
+        const toSuggestion = (v: string): Suggestion => ({
           value: v,
           fieldName: field.fieldName,
           columnName: field.columnName,
           tableName: field.tableName,
           fieldType: field.fieldType
-        }));
+        });
+        const sliced = matches.slice(0, maxPerField).map(toSuggestion);
         (sliced as any)._totalCount = matches.length;
         grouped[field.fieldName] = sliced;
+        allMatches[field.fieldName] = matches.map(toSuggestion);
       }
     }
 
@@ -937,7 +956,7 @@ export class SmartSearchVisual implements IVisual {
       const suggestions = grouped[fieldName];
       const totalCount = (suggestions as any)._totalCount as number;
       const countLabel = totalCount > suggestions.length
-        ? `${suggestions.length} de ${totalCount}`
+        ? `${suggestions.length} ${this.t.of} ${totalCount}`
         : `${suggestions.length}`;
       const group = document.createElement('div');
       group.className = 'suggestion-group';
@@ -947,6 +966,25 @@ export class SmartSearchVisual implements IVisual {
           <span class="group-count">${countLabel}</span>
         </div>
       `;
+
+      // "Select all" button in the group header
+      const allForField = allMatches[fieldName];
+      if (allForField && allForField.length > 1) {
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.className = 'group-select-all';
+        selectAllBtn.textContent = `${this.t.selectAll} (${allForField.length})`;
+        selectAllBtn.title = `${this.t.selectAll} (${allForField.length})`;
+        selectAllBtn.addEventListener('mousedown', (e: MouseEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+        selectAllBtn.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation();
+          this.applyFilterAll(allForField);
+        });
+        const groupLabel = group.querySelector('.group-label') as HTMLElement;
+        if (groupLabel) groupLabel.appendChild(selectAllBtn);
+      }
 
       for (const sug of suggestions) {
         const itemId = `ss-opt-${optionIndex}`;
@@ -1016,6 +1054,31 @@ export class SmartSearchVisual implements IVisual {
     this.renderTags();
     this.sendFilters();
     this.announce(`${this.t.filterApplied}: ${sug.value}`); // Issue 1
+  }
+
+  // ── Apply all matching filters for a field group ─────────
+  private applyFilterAll(suggestions: Suggestion[]): void {
+    let added = 0;
+    for (const sug of suggestions) {
+      const alreadyExists = this.activeFilters.find(
+        f => f.fieldName === sug.fieldName && f.value === sug.value
+      );
+      if (alreadyExists) continue;
+      this.activeFilters.push({
+        fieldName: sug.fieldName,
+        columnName: sug.columnName,
+        tableName: sug.tableName,
+        value: sug.value,
+        id: `${sug.tableName}_${sug.columnName}_${Date.now()}_${added}`
+      });
+      added++;
+    }
+    if (added === 0) return;
+    this.inputEl.value = '';
+    this.hideDropdown();
+    this.renderTags();
+    this.sendFilters();
+    this.announce(`${this.t.filterApplied}: ${added} ${suggestions[0]?.fieldName ?? ''}`);
   }
 
   // ── Apply filter (Ctrl+Click — mantém dropdown aberto) ────
@@ -1196,7 +1259,7 @@ export class SmartSearchVisual implements IVisual {
   }
 
   // Slots declarados no capabilities.json para múltiplos filtros simultâneos
-  private readonly FILTER_SLOTS = ["filter","filter1","filter2","filter3","filter4","filter5","filter6","filter7","filter8","filter9"];
+  private readonly FILTER_SLOTS = ["filter","filter1","filter2","filter3","filter4","filter5","filter6","filter7","filter8","filter9","filter10","filter11","filter12","filter13","filter14","filter15","filter16","filter17","filter18","filter19","filter20","filter21","filter22","filter23","filter24"];
 
   // ── Send filters to Power BI ──────────────────
   private sendFilters(): void {

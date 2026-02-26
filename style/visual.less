@@ -183,6 +183,28 @@
           font-size: 12px;
           font-weight: 600;
         }
+
+        .group-select-all {
+          margin-left: auto;
+          padding: 1px 8px;
+          border-radius: 8px;
+          border: 1px solid color-mix(in srgb, var(--ss-group-label-color, #333333) 35%, transparent);
+          background: var(--ss-bg-color, #ffffff);
+          color: var(--ss-group-label-color, #333333);
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          text-transform: none;
+          letter-spacing: 0;
+          white-space: nowrap;
+          transition: background 0.15s, border-color 0.15s;
+
+          &:hover {
+            background: var(--ss-group-label-color, #333333);
+            color: var(--ss-header-text-color, #ffffff);
+            border-color: var(--ss-group-label-color, #333333);
+          }
+        }
       }
 
       .suggestion-item {
