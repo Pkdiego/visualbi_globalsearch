@@ -369,18 +369,24 @@
       padding: 0;
       width: 100%;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
 
       .landing-free {
         font-size: 12px;
         font-weight: 500;
         color: color-mix(in srgb, var(--ss-text-color, #333333) 65%, transparent);
-        text-align: left;
-        flex: 1;
+        text-align: center;
         line-height: 1.4;
+      }
+
+      .landing-links {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
       }
 
       .landing-linkedin {
@@ -459,6 +465,13 @@
       cursor: default;
       max-width: 100%;
       animation: tagSlideIn 0.2s ease;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+
+      &.removing {
+        opacity: 0;
+        transform: scale(0.8);
+        pointer-events: none;
+      }
 
       .tag-label {
         white-space: nowrap;
@@ -501,6 +514,13 @@
     padding: 5px 10px;
     gap: 12px;
     cursor: default;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+
+    &.removing {
+      opacity: 0;
+      transform: translateX(8px);
+      pointer-events: none;
+    }
 
     &:hover {
       background: var(--ss-item-hover-color, #f5f5f5);

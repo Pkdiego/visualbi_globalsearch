@@ -108,3 +108,5 @@ Todos os textos do visual e do Format Pane são traduzidos de acordo com o idiom
 ---
 
 *Global Search — desenvolvido por Diego Dias*
+
+[🌐 www.newlevel.com.br](https://www.newlevel.com.br)

@@ -115,7 +115,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Pesquise em vários campos simultaneamente",
     hint2:        "Filtragem em cascata inteligente",
     hint3:        "Clique em qualquer sugestão para filtrar",
-    landingFree:  "Este visual é completamente gratuito · Avalie se foi útil 😊",
+    landingFree:  "Este visual é completamente gratuito. Avalie se for útil para você. 😁",
     clearTitle:   "Limpar todos os filtros",
     removeFilter: "Remover filtro",
     fp_appearance:       "Aparência",
@@ -192,7 +192,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Busque en varios campos simultáneamente",
     hint2:        "Filtrado en cascada inteligente",
     hint3:        "Haga clic en cualquier sugerencia para filtrar",
-    landingFree:  "Este visual es completamente gratuito · Valóralo si fue útil 😊",
+    landingFree:  "Este visual es completamente gratuito. Valóralo si te fue útil. 😁",
     clearTitle:   "Limpiar todos los filtros",
     removeFilter: "Eliminar filtro",
     fp_appearance:       "Apariencia",
@@ -269,7 +269,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Search across multiple fields simultaneously",
     hint2:        "Smart cascade filtering",
     hint3:        "Click any suggestion to filter instantly",
-    landingFree:  "This visual is completely free · Rate it if it was useful 😊",
+    landingFree:  "This visual is completely free. Rate it if it's useful to you. 😁",
     clearTitle:   "Clear all filters",
     removeFilter: "Remove filter",
     fp_appearance:       "Appearance",
@@ -347,9 +347,9 @@ function getI18n(locale: string): I18nStrings {
 // Internal types
 // ─────────────────────────────────────────────
 interface FieldData {
-  fieldName: string;   // display name (pode ser renomeado pelo usuário)
-  columnName: string;  // nome real da coluna no modelo (do queryName)
-  tableName: string;
+  fieldName: string;    // displayName da coluna (visível ao usuário)
+  tableName: string;    // extraído de col.expr.source.entity — sempre atualizado
+  columnName: string;   // extraído de col.expr.ref — nome real da coluna no modelo
   values: string[];
   columnIndex: number;
   fieldType: 'text' | 'numeric' | 'date';
@@ -359,16 +359,16 @@ type RawRow = Map<number, string>;
 
 interface Suggestion {
   value: string;
-  fieldName: string;   // nome de exibição
-  columnName: string;  // nome real da coluna no modelo
-  tableName: string;
+  fieldName: string;    // displayName da coluna
+  tableName: string;    // nome real da tabela (de expr.source.entity)
+  columnName: string;   // nome real da coluna (de expr.ref)
   fieldType: 'text' | 'numeric' | 'date';
 }
 
 interface ActiveFilter {
-  fieldName: string;   // nome de exibição
-  columnName: string;  // nome real da coluna no modelo
-  tableName: string;
+  fieldName: string;    // displayName — para exibir na tag
+  tableName: string;    // sincronizado a cada update() via fieldMap
+  columnName: string;   // sincronizado a cada update() via fieldMap
   value: string;
   id: string;
 }
@@ -535,6 +535,8 @@ export class SmartSearchVisual implements IVisual {
   private fields: FieldData[] = [];
   private rawRows: RawRow[] = [];
   private activeFilters: ActiveFilter[] = [];
+  /** Maps displayName → "tableName.columnName" (from expr). Rebuilt every update() cycle. */
+  private fieldMap: Map<string, string> = new Map();
   private focusedIndex: number = -1;
   private debounceTimer: any = null;
   private placeholderTimer: any = null;
@@ -600,10 +602,16 @@ export class SmartSearchVisual implements IVisual {
         <div class="landing-title">${this.t.landingTitle}</div>
         <div class="landing-footer">
           <span class="landing-free" id="landingFreeText">${this.t.landingFree}</span>
-          <a class="landing-linkedin" href="https://www.linkedin.com/in/diegodias93/" title="Diego Dias — LinkedIn" target="_blank">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-            Diego Dias
-          </a>
+          <div class="landing-links">
+            <a class="landing-linkedin" href="https://www.linkedin.com/in/diegodias93/" title="Diego Dias — LinkedIn" target="_blank">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+              Diego Dias
+            </a>
+            <a class="landing-linkedin" href="https://www.newlevel.com.br" title="New Level" target="_blank">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              newlevel.com.br
+            </a>
+          </div>
         </div>
         <hr class="landing-divider" />
         <div class="landing-text">${this.t.landingText}</div>
@@ -620,8 +628,7 @@ export class SmartSearchVisual implements IVisual {
     this.dropdownEl = this.container.querySelector('#suggestionsDropdown') as HTMLElement;
     this.clearBtn   = this.container.querySelector('#clearBtn') as HTMLElement;
     this.searchIcon = this.container.querySelector('#searchIcon') as HTMLElement;
-    this.liveRegion = this.container.querySelector('#ssLiveRegion') as HTMLElement;
-
+    this.liveRegion  = this.container.querySelector('#ssLiveRegion') as HTMLElement;
     this.bindEvents();
   }
 
@@ -890,7 +897,7 @@ export class SmartSearchVisual implements IVisual {
   }
 
   // ── Render suggestions dropdown ───────────────
-  private renderSuggestions(query: string): void {
+  private renderSuggestions(query: string, skipAnimation = false): void {
     const t0 = performance.now(); // Issue 4: perf timing start
     const listEl = this.dropdownEl.querySelector('#suggestionsList') as HTMLElement;
     listEl.innerHTML = '';
@@ -926,8 +933,8 @@ export class SmartSearchVisual implements IVisual {
         const toSuggestion = (v: string): Suggestion => ({
           value: v,
           fieldName: field.fieldName,
-          columnName: field.columnName,
           tableName: field.tableName,
+          columnName: field.columnName,
           fieldType: field.fieldType
         });
         const sliced = matches.slice(0, maxPerField).map(toSuggestion);
@@ -990,7 +997,13 @@ export class SmartSearchVisual implements IVisual {
         const itemId = `ss-opt-${optionIndex}`;
         const item = document.createElement('div');
         item.className = 'suggestion-item';
-        item.style.setProperty('--item-index', String(optionIndex));
+        if (skipAnimation) {
+          item.style.animation = 'none';
+          item.style.opacity = '1';
+          item.style.transform = 'none';
+        } else {
+          item.style.setProperty('--item-index', String(optionIndex));
+        }
         item.title = sug.value;
         optionIndex++;
         // Issue 1: ARIA roles for options
@@ -1043,8 +1056,8 @@ export class SmartSearchVisual implements IVisual {
 
     this.activeFilters.push({
       fieldName: sug.fieldName,
-      columnName: sug.columnName,
       tableName: sug.tableName,
+      columnName: sug.columnName,
       value: sug.value,
       id: `${sug.tableName}_${sug.columnName}_${Date.now()}`
     });
@@ -1066,8 +1079,8 @@ export class SmartSearchVisual implements IVisual {
       if (alreadyExists) continue;
       this.activeFilters.push({
         fieldName: sug.fieldName,
-        columnName: sug.columnName,
         tableName: sug.tableName,
+        columnName: sug.columnName,
         value: sug.value,
         id: `${sug.tableName}_${sug.columnName}_${Date.now()}_${added}`
       });
@@ -1090,21 +1103,21 @@ export class SmartSearchVisual implements IVisual {
 
     this.activeFilters.push({
       fieldName: sug.fieldName,
-      columnName: sug.columnName,
       tableName: sug.tableName,
+      columnName: sug.columnName,
       value: sug.value,
       id: `${sug.tableName}_${sug.columnName}_${Date.now()}`
     });
 
-    this.renderTags();
+    this.renderTags(true);
     this.sendFilters();
     this.announce(`${this.t.filterApplied}: ${sug.value}`); // Issue 1
-    // Re-renderiza sugestões para remover o item recém-adicionado
-    this.renderSuggestions(this.inputEl.value.trim());
+    // Re-renderiza sugestões sem animação para evitar o blink
+    this.renderSuggestions(this.inputEl.value.trim(), true);
   }
 
   // ── Render filter tags ────────────────────────
-  private renderTags(): void {
+  private renderTags(skipAnimation = false): void {
     const tagsEl = this.container.querySelector('#activeFilters') as HTMLElement;
     tagsEl.innerHTML = '';
 
@@ -1122,6 +1135,11 @@ export class SmartSearchVisual implements IVisual {
     for (const [fieldName, filters] of grouped) {
       const tag = document.createElement('div');
       tag.className = 'filter-tag';
+      if (skipAnimation) {
+        tag.style.animation = 'none';
+        tag.style.opacity = '1';
+        tag.style.transform = 'none';
+      }
 
       if (filters.length === 1) {
         // Tag simples — comportamento original
@@ -1265,10 +1283,10 @@ export class SmartSearchVisual implements IVisual {
   private sendFilters(): void {
     if (this.activeFilters.length === 0) { this.clearAllFilters(); return; }
 
-    // Group active filters by real column name, collecting all values per column
+    // Group active filters by column identity (tableName + columnName from expr — always current)
     const grouped = new Map<string, { tableName: string; columnName: string; values: string[] }>();
     for (const af of this.activeFilters) {
-      const key = `${af.tableName}|${af.columnName}`;
+      const key = `${af.tableName}\x00${af.columnName}`;
       if (!grouped.has(key)) {
         grouped.set(key, { tableName: af.tableName, columnName: af.columnName, values: [] });
       }
@@ -1572,10 +1590,10 @@ export class SmartSearchVisual implements IVisual {
     this.fields = [];
     for (let colIdx = 0; colIdx < columns.length; colIdx++) {
       const col = columns[colIdx];
-      const queryName = col.queryName || '';
-      const parts = queryName.split('.');
-      const tableName = parts[0] || col.displayName;
-      const columnName = parts[1] || col.displayName;
+      // Use expr.source.entity (always current) instead of queryName (frozen at bind time)
+      const expr = (col as any).expr;
+      const tableName: string = (expr?.source?.entity) || col.queryName?.split('.')[0] || col.displayName;
+      const columnName: string = (expr?.ref) || col.queryName?.split('.')[1] || col.displayName;
       const fieldName = col.displayName;
 
       let fieldType: 'text' | 'numeric' | 'date' = 'text';
@@ -1588,7 +1606,28 @@ export class SmartSearchVisual implements IVisual {
         if (val) uniqueValues.add(val);
       }
 
-      this.fields.push({ fieldName, columnName, tableName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx, fieldType });
+      this.fields.push({ fieldName, tableName, columnName, values: Array.from(uniqueValues).sort(), columnIndex: colIdx, fieldType });
+    }
+
+    // Rebuild fieldMap (displayName → {tableName, columnName} from expr — always current).
+    // If table was renamed, expr.source.entity already reflects the new name.
+    this.fieldMap.clear();
+    for (const field of this.fields) {
+      this.fieldMap.set(field.fieldName, `${field.tableName}.${field.columnName}`);
+    }
+
+    // Sync active filters with current table/column names and re-apply if renamed
+    let namesChanged = false;
+    for (const af of this.activeFilters) {
+      const field = this.fields.find(f => f.fieldName === af.fieldName);
+      if (field && (field.tableName !== af.tableName || field.columnName !== af.columnName)) {
+        af.tableName = field.tableName;
+        af.columnName = field.columnName;
+        namesChanged = true;
+      }
+    }
+    if (namesChanged && this.activeFilters.length > 0) {
+      this.sendFilters();
     }
 
     // Update perf counts

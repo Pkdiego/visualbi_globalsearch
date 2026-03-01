@@ -1,0 +1,61 @@
+
+> smart-search-visual@1.1.0.1 package
+> pbiviz package
+
+ info   powerbi-visuals-tools version - 7.0.2
+ warn   Using recommended eslint config.
+ info   Running lint check...
+ error  Linter found 12 errors and 0 warnings. Run with --verbose flag to see details.
+ info   Lint check completed.
+(node:25984) [DEP0187] DeprecationWarning: Passing invalid argument types to fs.existsSync is deprecated
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ warn   Certificate verification error: Error: PFX or passphrase file not found
+ info   Generating a new certificate...
+ error  Create certificate error: 'pwsh' n�o � reconhecido como um comando interno
+ou externo, um programa oper�vel ou um arquivo em lotes.
+
+ info   Start packaging...
+ info   Start preparing plugin template
+ info   Finish preparing plugin template
+ info   Start packaging...
+ info   Package compression enabled
+ info   Package compression enabled
+ info   Package created!
+ info   Package created!
+ info   Finish packaging
+ info   Finish packaging
+[1mWebpack Bundle Analyzer[22m saved report to [1mC:\Users\Diego\Desktop\visualbi_globalsearch\webpack.statistics.prod.html[22m
+ 
+ done   Build completed successfully
+ warn   Visual doesn't support some features recommended for all custom visuals:
+ 
+ warn   Allow Interactions - https://learn.microsoft.com/en-us/power-bi/developer/visuals/visuals-interactions
+ warn   Bookmarks - https://learn.microsoft.com/en-us/power-bi/developer/visuals/bookmarks-support
+ warn   Color Palette - https://learn.microsoft.com/en-us/power-bi/developer/visuals/add-colors-power-bi-visual
+ warn   High Contrast - https://learn.microsoft.com/en-us/power-bi/developer/visuals/high-contrast-support
+ warn   Keyboard Navigation - https://learn.microsoft.com/en-us/power-bi/developer/visuals/supportskeyboardfocus-feature
+ warn   Localizations - https://learn.microsoft.com/en-us/power-bi/developer/visuals/localization
+ warn   Sync Slicer - https://learn.microsoft.com/en-us/power-bi/developer/visuals/enable-sync-slicers
+ warn   Tooltips - https://learn.microsoft.com/en-us/power-bi/developer/visuals/add-tooltips
+ 
+ info   Visual can be improved by adding 8 more optional features.
+ 
+ info   Run `pbiviz package` with --verbose flag to see more details.
+ 
+C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\logging\Logger.js:174
+			throw new Error(`No such label '${label}' for WebpackLogger.timeEnd()`);
+			^
+
+Error: No such label 'emitAssets' for WebpackLogger.timeEnd()
+    at WebpackLogger.timeEnd (C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\logging\Logger.js:174:10)
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\Compiler.js:553:15
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\Compiler.js:1030:14
+    at Hook.eval [as callAsync] (eval at create (C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\Compiler.js:1027:27
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\neo-async\async.js:2818:7
+    at done (C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\neo-async\async.js:3522:9)
+    at Hook.eval [as callAsync] (eval at create (C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:6:1)
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\webpack\lib\Compiler.js:856:33
+    at C:\Users\Diego\Desktop\visualbi_globalsearch\node_modules\graceful-fs\graceful-fs.js:143:16
+
+Node.js v24.12.0
