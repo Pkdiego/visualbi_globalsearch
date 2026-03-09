@@ -29,6 +29,7 @@ interface I18nStrings {
   hint1: string;
   hint2: string;
   hint3: string;
+  hint4: string;
   landingFree: string;
   clearTitle: string;
   removeFilter: string;
@@ -115,6 +116,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Pesquise em vários campos simultaneamente",
     hint2:        "Filtragem em cascata inteligente",
     hint3:        "Clique em qualquer sugestão para filtrar",
+    hint4:        "Organize filtros com sistema de tags",
     landingFree:  "Este visual é completamente gratuito. Avalie se for útil para você. 😁",
     clearTitle:   "Limpar todos os filtros",
     removeFilter: "Remover filtro",
@@ -192,6 +194,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Busque en varios campos simultáneamente",
     hint2:        "Filtrado en cascada inteligente",
     hint3:        "Haga clic en cualquier sugerencia para filtrar",
+    hint4:        "Organice filtros con sistema de etiquetas",
     landingFree:  "Este visual es completamente gratuito. Valóralo si te fue útil. 😁",
     clearTitle:   "Limpiar todos los filtros",
     removeFilter: "Eliminar filtro",
@@ -269,6 +272,7 @@ const I18N: Record<string, I18nStrings> = {
     hint1:        "Search across multiple fields simultaneously",
     hint2:        "Smart cascade filtering",
     hint3:        "Click any suggestion to filter instantly",
+    hint4:        "Organize filters with tag system",
     landingFree:  "This visual is completely free. Rate it if it's useful to you. 😁",
     clearTitle:   "Clear all filters",
     removeFilter: "Remove filter",
@@ -619,6 +623,7 @@ export class SmartSearchVisual implements IVisual {
           <li>${this.t.hint1}</li>
           <li>${this.t.hint2}</li>
           <li>${this.t.hint3}</li>
+          <li>${this.t.hint4}</li>
         </ul>
       </div>
       </div>
@@ -663,7 +668,7 @@ export class SmartSearchVisual implements IVisual {
     if (landingText) landingText.textContent = this.t.landingText;
 
     const hints = this.container.querySelectorAll('.landing-hints li');
-    const hintTexts = [this.t.hint1, this.t.hint2, this.t.hint3];
+    const hintTexts = [this.t.hint1, this.t.hint2, this.t.hint3, this.t.hint4];
     hints.forEach((li, i) => { if (hintTexts[i]) li.textContent = hintTexts[i]; });
 
     const landingFreeEl = this.container.querySelector('#landingFreeText') as HTMLElement;
