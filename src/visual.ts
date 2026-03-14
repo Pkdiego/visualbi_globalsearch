@@ -70,6 +70,7 @@ interface I18nStrings {
   fp_itemFontFamily: string;
   fp_groupLabelFontSize: string;
   fp_headerFontSize: string;
+  fp_showItemFieldHint: string;
   fp_headerHeight: string;
   fp_filterTags: string;
   fp_tags: string;
@@ -156,6 +157,7 @@ const I18N: Record<string, I18nStrings> = {
     fp_itemFontFamily:   "Família da Fonte dos Itens",
     fp_groupLabelFontSize:"Tamanho da Fonte do Grupo (px)",
     fp_headerFontSize:   "Tamanho da Fonte do Cabeçalho (px)",
+    fp_showItemFieldHint:"Mostrar campo de origem no item",
     fp_headerHeight:     "Altura do Cabeçalho (px)",
     fp_filterTags:       "Tags de Filtro",
     fp_tags:             "Tags",
@@ -234,6 +236,7 @@ const I18N: Record<string, I18nStrings> = {
     fp_itemFontFamily:   "Familia de Fuente de Ítems",
     fp_groupLabelFontSize:"Tamaño de Fuente del Grupo (px)",
     fp_headerFontSize:   "Tamaño de Fuente del Encabezado (px)",
+    fp_showItemFieldHint:"Mostrar campo de origen en el ítem",
     fp_headerHeight:     "Alto del Encabezado (px)",
     fp_filterTags:       "Etiquetas de Filtro",
     fp_tags:             "Etiquetas",
@@ -312,6 +315,7 @@ const I18N: Record<string, I18nStrings> = {
     fp_itemFontFamily:   "Item Font Family",
     fp_groupLabelFontSize:"Group Label Font Size (px)",
     fp_headerFontSize:   "Header Font Size (px)",
+    fp_showItemFieldHint:"Show source field on item",
     fp_headerHeight:     "Header Height (px)",
     fp_filterTags:       "Filter Tags",
     fp_tags:             "Tags",
@@ -419,6 +423,7 @@ interface FormatSettings {
   ignoreAccents: boolean;
   caseSensitive: boolean;
   showDiagnostics: boolean;
+  showItemFieldHint: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -495,7 +500,8 @@ const DEFAULT_FORMAT: FormatSettings = {
   searchMode: "contains",
   ignoreAccents: true,
   caseSensitive: false,
-  showDiagnostics: true,
+  showDiagnostics: false,
+  showItemFieldHint: true,
 };
 
 // ─────────────────────────────────────────────
@@ -772,7 +778,8 @@ export class SmartSearchVisual implements IVisual {
       searchMode:      getValue(objects, 'searchConfig', 'searchMode',      DEFAULT_FORMAT.searchMode),
       ignoreAccents:   getValue(objects, 'searchConfig', 'ignoreAccents',   DEFAULT_FORMAT.ignoreAccents),
       caseSensitive:   getValue(objects, 'searchConfig', 'caseSensitive',   DEFAULT_FORMAT.caseSensitive),
-      showDiagnostics: getValue(objects, 'searchConfig', 'showDiagnostics', DEFAULT_FORMAT.showDiagnostics),
+      showDiagnostics:   getValue(objects, 'searchConfig', 'showDiagnostics',   DEFAULT_FORMAT.showDiagnostics),
+      showItemFieldHint: getValue(objects, 'dropdown',     'showItemFieldHint', DEFAULT_FORMAT.showItemFieldHint),
     };
 
     // Apply theme colors only for properties the user has NOT explicitly customized
@@ -1018,7 +1025,7 @@ export class SmartSearchVisual implements IVisual {
         const snippet = this.buildSnippet(sug.value, query);
         item.innerHTML = `
           <span class="full-value">${snippet}</span>
-          <span class="item-field-hint" aria-hidden="true">→ ${this.escapeHtml(sug.fieldName)}</span>
+          ${this.fmt.showItemFieldHint ? `<span class="item-field-hint" aria-hidden="true">→ ${this.escapeHtml(sug.fieldName)}</span>` : ''}
         `;
         item.addEventListener('mousedown', (e: MouseEvent) => {
           if (e.ctrlKey || e.metaKey) {
@@ -1942,6 +1949,7 @@ export class SmartSearchVisual implements IVisual {
         { objectName: "dropdown", propertyName: "matchTextColor" },
         { objectName: "dropdown", propertyName: "maxResults" },
         { objectName: "dropdown", propertyName: "dropdownMaxHeight" },
+        { objectName: "dropdown", propertyName: "showItemFieldHint" },
         { objectName: "dropdown", propertyName: "itemFontSize" },
         { objectName: "dropdown", propertyName: "itemFontFamily" },
         { objectName: "dropdown", propertyName: "groupLabelFontSize" },
@@ -2040,6 +2048,17 @@ export class SmartSearchVisual implements IVisual {
                   options: {
                     minValue: { type: ValidatorType.Min, value: 100 }
                   }
+                }
+              }
+            },
+            {
+              uid: "showItemFieldHint_slice",
+              displayName: t.fp_showItemFieldHint,
+              control: {
+                type: FormattingComponent.ToggleSwitch,
+                properties: {
+                  descriptor: { objectName: "dropdown", propertyName: "showItemFieldHint" },
+                  value: f.showItemFieldHint
                 }
               }
             },

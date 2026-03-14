@@ -183,6 +183,10 @@
           "displayName": "Dropdown Max Height (px)",
           "type": { "numeric": true }
         },
+        "showItemFieldHint": {
+          "displayName": "Show source field on item",
+          "type": { "bool": true }
+        },
         "itemFontSize": {
           "displayName": "Item Font Size (px)",
           "type": { "numeric": true }
