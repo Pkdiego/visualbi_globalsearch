@@ -1300,29 +1300,29 @@ export class SmartSearchVisual implements IVisual {
 
     const groups = Array.from(grouped.values());
 
-    // Assign one declared slot per column group, clear any unused slots
-    for (let i = 0; i < this.FILTER_SLOTS.length; i++) {
-      const slot = this.FILTER_SLOTS[i];
-      const group = groups[i];
-      if (group) {
-        try {
-          const basicFilter = {
-            $schema: "https://powerbi.com/product/schema#basic",
-            filterType: 1,
-            target: { table: group.tableName, column: group.columnName },
-            operator: "In",
-            values: group.values,
-            requireSingleSelection: false
-          };
-          this.host.applyJsonFilter(basicFilter as powerbi.IFilter, "general", slot, FilterAction.merge);
-        } catch (e) {
-          console.error("[SmartSearch] Filter error:", e);
-        }
-      } else {
-        try {
-          this.host.applyJsonFilter(null, "general", slot, FilterAction.remove);
-        } catch (e) { /* slot already empty */ }
-      }
+    // Build all basic filters as an array and send in a single slot.
+    // Sending multiple applyJsonFilter calls sequentially causes the Power BI host
+    // to process only the last one. A single array call applies all as AND.
+    const allFilters = groups.map(group => ({
+      $schema: "https://powerbi.com/product/schema#basic",
+      filterType: 1,
+      target: { table: group.tableName, column: group.columnName },
+      operator: "In",
+      values: group.values,
+      requireSingleSelection: false
+    }));
+
+    try {
+      this.host.applyJsonFilter(allFilters as powerbi.IFilter[], "general", "filter", FilterAction.merge);
+    } catch (e) {
+      console.error("[SmartSearch] Filter error:", e);
+    }
+
+    // Clear all other slots (previously used when multi-slot strategy was active)
+    for (let i = 1; i < this.FILTER_SLOTS.length; i++) {
+      try {
+        this.host.applyJsonFilter(null, "general", this.FILTER_SLOTS[i], FilterAction.remove);
+      } catch (e) { /* slot already empty */ }
     }
   }
 
