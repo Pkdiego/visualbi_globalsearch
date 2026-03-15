@@ -1296,11 +1296,11 @@ export class SmartSearchVisual implements IVisual {
     if (this.activeFilters.length === 0) { this.clearAllFilters(); return; }
 
     // Group active filters by column identity (tableName + columnName from expr — always current)
-    const grouped = new Map<string, { tableName: string; columnName: string; values: string[] }>();
+    const grouped = new Map<string, { tableName: string; columnName: string; fieldName: string; values: string[] }>();
     for (const af of this.activeFilters) {
       const key = `${af.tableName}\x00${af.columnName}`;
       if (!grouped.has(key)) {
-        grouped.set(key, { tableName: af.tableName, columnName: af.columnName, values: [] });
+        grouped.set(key, { tableName: af.tableName, columnName: af.columnName, fieldName: af.fieldName, values: [] });
       }
       grouped.get(key)!.values.push(af.value);
     }
@@ -1310,14 +1310,21 @@ export class SmartSearchVisual implements IVisual {
     // Build all basic filters as an array and send in a single slot.
     // Sending multiple applyJsonFilter calls sequentially causes the Power BI host
     // to process only the last one. A single array call applies all as AND.
-    const allFilters = groups.map(group => ({
-      $schema: "https://powerbi.com/product/schema#basic",
-      filterType: 1,
-      target: { table: group.tableName, column: group.columnName },
-      operator: "In",
-      values: group.values,
-      requireSingleSelection: false
-    }));
+    const allFilters = groups.map(group => {
+      const fieldData = this.fields.find(f => f.fieldName === group.fieldName);
+      const isNumeric = fieldData?.fieldType === 'numeric';
+      const typedValues = isNumeric
+        ? group.values.map(v => { const n = Number(v); return isNaN(n) ? v : n; })
+        : group.values;
+      return {
+        $schema: "https://powerbi.com/product/schema#basic",
+        filterType: 1,
+        target: { table: group.tableName, column: group.columnName },
+        operator: "In",
+        values: typedValues,
+        requireSingleSelection: false
+      };
+    });
 
     try {
       this.host.applyJsonFilter(allFilters as powerbi.IFilter[], "general", "filter", FilterAction.merge);
@@ -1336,10 +1343,10 @@ export class SmartSearchVisual implements IVisual {
   // ── Remove individual filter ──────────────────
   private removeFilter(id: string): void {
     this.activeFilters = this.activeFilters.filter(f => f.id !== id);
-    this.renderTags();
     if (this.activeFilters.length === 0) {
       this.clearAllFilters();
     } else {
+      this.renderTags();
       this.sendFilters();
     }
   }
@@ -1628,17 +1635,61 @@ export class SmartSearchVisual implements IVisual {
       this.fieldMap.set(field.fieldName, `${field.tableName}.${field.columnName}`);
     }
 
+    // Restore active filters from saved state (jsonFilters) on first load.
+    // This ensures tags are shown when the PBIX is reopened with filters already applied.
+    if (this.activeFilters.length === 0 && options.jsonFilters && (options.jsonFilters as any[]).length > 0) {
+      // Track filters from jsonFilters that reference fields no longer in the visual
+      let hasOrphanedFilters = false;
+      for (const raw of options.jsonFilters as any[]) {
+        if (raw?.filterType !== 1 || !raw.target || !Array.isArray(raw.values)) continue;
+        const { table, column } = raw.target;
+        const field = this.fields.find(f => f.tableName === table && f.columnName === column);
+        if (!field) {
+          // Field was removed from visual but filter persists in Power BI — mark for cleanup
+          hasOrphanedFilters = true;
+          continue;
+        }
+        for (let i = 0; i < raw.values.length; i++) {
+          const strVal = String(raw.values[i]);
+          this.activeFilters.push({
+            fieldName: field.fieldName,
+            tableName: field.tableName,
+            columnName: field.columnName,
+            value: strVal,
+            id: `${field.tableName}_${field.columnName}_${Date.now()}_${i}`
+          });
+        }
+      }
+      if (this.activeFilters.length > 0) {
+        this.renderTags();
+        // If orphaned filters exist, re-send only the valid ones to clear the orphans from Power BI
+        if (hasOrphanedFilters) {
+          this.sendFilters();
+        }
+      } else if (hasOrphanedFilters) {
+        // All filters were orphaned — clear everything
+        this.clearAllFilters();
+      }
+    }
+
     // Sync active filters with current table/column names and re-apply if renamed
     let namesChanged = false;
     for (const af of this.activeFilters) {
-      const field = this.fields.find(f => f.fieldName === af.fieldName);
-      if (field && (field.tableName !== af.tableName || field.columnName !== af.columnName)) {
-        af.tableName = field.tableName;
-        af.columnName = field.columnName;
-        namesChanged = true;
+      // Match by tableName+columnName (structural identity) — handles displayName renames
+      let field = this.fields.find(f => f.tableName === af.tableName && f.columnName === af.columnName);
+      // Fallback: match by fieldName (displayName) — handles table/column renames
+      if (!field) field = this.fields.find(f => f.fieldName === af.fieldName);
+      if (field) {
+        if (field.tableName !== af.tableName || field.columnName !== af.columnName || field.fieldName !== af.fieldName) {
+          af.tableName = field.tableName;
+          af.columnName = field.columnName;
+          af.fieldName = field.fieldName;
+          namesChanged = true;
+        }
       }
     }
     if (namesChanged && this.activeFilters.length > 0) {
+      this.renderTags();
       this.sendFilters();
     }
 
